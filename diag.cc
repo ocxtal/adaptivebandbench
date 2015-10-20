@@ -1,0 +1,348 @@
+
+/**
+ * @file diag.cc
+ *
+ * @brief SIMD banded
+ */
+#include <string.h>
+#include <smmintrin.h>
+#include "sse.h"
+#include "util.h"
+
+#define BW		( 8 )
+#define MIN 	( 0 )
+#define OFS 	( 32768 )
+
+/**
+ * @fn diag_linear
+ */
+int
+diag_linear(
+	char const *a,
+	uint64_t alen,
+	char const *b,
+	uint64_t blen,
+	int8_t m, int8_t x, int8_t gi, int8_t ge)
+{
+	uint16_t *mat = (uint16_t *)aligned_malloc(
+		(MIN3(2*alen, alen+blen, 2*blen)) * BW * sizeof(uint16_t),
+		sizeof(__m128i));
+	uint16_t *ptr = mat;
+
+	debug("%lld, %lld",
+		MIN3(2*alen, alen+blen, 2*blen),
+		MIN3(2*alen, alen+blen, 2*blen) * BW * sizeof(uint16_t));
+
+	struct _w {
+		uint16_t b[BW];
+		uint16_t pad1[8];
+		uint16_t a[BW];
+		uint16_t pv[BW];
+		uint16_t pad2[8];
+		uint16_t cv[BW];
+		uint16_t pad3[8];
+	} w __attribute__(( aligned(16) ));
+	uint16_t maxv[BW] __attribute__(( aligned(16) ));
+
+	/* init char vec */
+	for(int i = 0; i < BW/2; i++) {
+		w.a[BW/2 + i] = 0x80;
+		w.b[i] = 0xff;
+	}
+	for(int i = 0; i < BW/2; i++) {
+		w.a[BW/2 - i - 1] = a[i];
+		w.b[BW/2 + i] = b[i];
+	}
+
+	/* init vec */
+	#define _Q(x)		( (x) - BW/2 )
+	for(int i = 0; i < BW; i++) {
+		w.pv[i] =      (_Q(i) < 0 ? -_Q(i)   : _Q(i)) * (2*gi - m) + OFS;
+		w.cv[i] = gi + (_Q(i) < 0 ? -_Q(i)-1 : _Q(i)) * (2*gi - m) + OFS;
+		debug("pv(%d), cv(%d)", w.pv[i], w.cv[i]);
+	}
+	#undef _Q
+
+	/* init maxv */
+	for(int i = 0; i < BW; i++) {
+		maxv[i] = 0;
+	}
+
+	uint64_t apos = BW/2;
+	uint64_t bpos = BW/2;
+	uint64_t const L = vec::LEN;
+	vec mv(m), xv(x), giv(gi);
+	for(int p = 0; p < MIN3(2*alen, alen+blen, 2*blen)-1; p++) {
+		if((p & 0x01) == 0x01)  {
+//			debug("go down");
+			w.pad1[0] = b[bpos++];
+			w.pad3[0] = MIN - gi;
+
+			vec cb; cb.load(w.b);
+			vec ch; ch.load(w.cv);
+			for(int i = 0; i < BW / L; i++) {
+				debug("loop: %d", i);
+				vec va; va.load(&w.a[L*i]);
+				vec tb; tb.load(&w.b[L*(i+1)]);
+				vec vb = (tb<<7) | (cb>>1);
+				cb = tb; vb.store(&w.b[L*i]);
+
+				vec scv = vec::comp(va, vb).select(mv, xv);
+				scv.print();
+
+				vec vd; vd.load(&w.pv[L*i]);
+				vec th; th.load(&w.cv[L*(i+1)]);
+				vec vv = ch; ch.store(&w.pv[L*i]);
+				vec vh = (th<<7) | (ch>>1);
+				ch = th;
+
+				vec nv = vec::max(vec::max(vh, vv) + giv, vd + scv);
+				nv.store(&w.cv[L*i]);
+				nv.store(&ptr[L*i]);
+
+				vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
+				t.store(&maxv[L*i]); t.print();
+
+				vd.print(); vv.print(); vh.print(); nv.print();
+			}
+		} else {
+//			debug("go right");
+			w.pad1[7] = a[apos++];
+
+			vec ca; ca.load(w.pad1);
+			vec cv; cv.ins(MIN - gi, 7);
+			for(int i = 0; i < BW / L; i++) {
+				debug("loop: %d", i);
+				vec ta; ta.load(&w.a[L*i]);
+				vec va = (ta<<1) | (ca>>7);
+				vec vb; vb.load(&w.b[L*i]);
+				ca = ta; va.store(&w.a[L*i]);
+
+				vec scv = vec::comp(va, vb).select(m, x);
+				scv.print();
+
+				vec vd; vd.load(&w.pv[L*i]);
+				vec tv; tv.load(&w.cv[L*i]);
+				vec vh = tv; tv.store(&w.pv[L*i]);
+				vec vv = (tv<<1) | (cv>>7);
+				cv = tv;
+
+				vec nv = vec::max(vec::max(vh, vv) + giv, vd + scv);
+				nv.store(&w.cv[L*i]);
+				nv.store(&ptr[L*i]);
+
+				vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
+				t.store(&maxv[L*i]); t.print();
+
+				vd.print(); vv.print(); vh.print(); nv.print();
+			}
+		}
+		ptr += BW;
+	}
+	free(mat);
+
+	int32_t max = 0;
+	for(int i = 0; i < BW / L; i++) {
+		vec t; t.load(&maxv[L*i]);
+		t.print();
+		debug("%d", t.hmax());
+		if(t.hmax() > max) { max = t.hmax(); }
+	}
+	return(max - OFS);
+}
+
+/**
+ * @fn diag_affine
+ */
+int
+diag_affine(
+	char const *a,
+	uint64_t alen,
+	char const *b,
+	uint64_t blen,
+	int8_t m, int8_t x, int8_t gi, int8_t ge)
+{
+	uint16_t *mat = (uint16_t *)aligned_malloc(
+		(MIN3(2*alen, alen+blen, 2*blen)) * 3 * BW * sizeof(uint16_t),
+		sizeof(__m128i));
+	uint16_t *ptr = mat;
+
+	struct _w {
+		uint16_t b[BW];
+		uint16_t pad1[8];
+		uint16_t a[BW];
+		uint16_t pv[BW];
+		uint16_t pad2[8];
+		uint16_t cv[BW];
+		uint16_t pad3[8];
+		uint16_t ce[BW];
+		uint16_t pad4[8];
+		uint16_t cf[BW];
+	} w __attribute__(( aligned(16) ));
+	uint16_t maxv[BW] __attribute__(( aligned(16) ));
+
+	/* init char vec */
+	for(int i = 0; i < BW/2; i++) {
+		w.a[BW/2 + i] = 0x80;
+		w.b[i] = 0xff;
+	}
+	for(int i = 0; i < BW/2; i++) {
+		w.a[BW/2 - i - 1] = a[i];
+		w.b[BW/2 + i] = b[i];
+	}
+
+	/* init vec */
+	#define _Q(x)		( (x) - BW/2 )
+	for(int i = 0; i < BW; i++) {
+		w.pv[i] =      (_Q(i) < 0 ? -_Q(i)   : _Q(i)) * (2*gi - m) + OFS;
+		w.cv[i] = gi + (_Q(i) < 0 ? -_Q(i)-1 : _Q(i)) * (2*gi - m) + OFS;
+		w.ce[i] = gi + (_Q(i) < 0 ? -_Q(i)-1 : _Q(i)+1) * (2*gi - m) + OFS;
+		w.cf[i] = gi + (_Q(i) < 0 ? -_Q(i) : _Q(i)) * (2*gi - m) + OFS;
+		debug("pv(%d), cv(%d)", w.pv[i], w.cv[i]);
+	}
+	#undef _Q
+
+	/* init maxv */
+	for(int i = 0; i < BW; i++) {
+		maxv[i] = 0;
+	}
+
+	uint64_t apos = BW/2;
+	uint64_t bpos = BW/2;
+	uint64_t const L = vec::LEN;
+	vec mv(m), xv(x), giv(gi), gev(ge);
+	for(int p = 0; p < MIN3(2*alen, alen+blen, 2*blen)-1; p++) {
+		if((p & 0x01) == 0x01)  {
+//			debug("go down");
+			w.pad1[0] = b[bpos++];
+			w.pad3[0] = MIN - gi;
+			w.pad4[0] = MIN - gi;
+
+			vec cb; cb.load(w.b);
+			vec ch; ch.load(w.cv);
+			vec ce; ce.load(w.ce);
+			for(int i = 0; i < BW / L; i++) {
+				debug("loop: %d", i);
+				vec va; va.load(&w.a[L*i]);
+				vec tb; tb.load(&w.b[L*(i+1)]);
+				vec vb = (tb<<7) | (cb>>1);
+				cb = tb; vb.store(&w.b[L*i]);
+
+				vec scv = vec::comp(va, vb).select(mv, xv);
+				scv.print();
+
+				/* load pv */
+				vec vd; vd.load(&w.pv[L*i]);
+				vd.print();
+
+				/* load v and h */
+				vec th; th.load(&w.cv[L*(i+1)]);
+				vec vv = ch; ch.store(&w.pv[L*i]);
+				vec vh = (th<<7) | (ch>>1);
+				ch = th;
+				vv.print();
+				vh.print();
+
+				/* load f and e */
+				vec te; te.load(&w.ce[L*(i+1)]);
+				vec vf; vf.load(&w.cf[L*i]);
+				vec ve = (te<<7) | (ce>>1);
+				ce = te;
+				vf.print();
+				ve.print();
+
+				/* update e and f */
+				vec ne = vec::max(vh + giv, ve + gev);
+				vec nf = vec::max(vv + giv, vf + gev);
+				ne.store(&w.ce[L*i]);
+				nf.store(&w.cf[L*i]);
+
+				/* update s */
+				vec nv = vec::max(vec::max(ne, nf), vd + scv);
+				nv.store(&w.cv[L*i]);
+				nv.store(&ptr[L*i]);
+
+				vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
+				t.store(&maxv[L*i]); t.print();
+			}
+		} else {
+//			debug("go right");
+			w.pad1[7] = a[apos++];
+
+			vec ca; ca.load(w.pad1);
+			vec cv; cv.ins(MIN - gi, 7);
+			vec cf; cf.ins(MIN - gi, 7);
+			for(int i = 0; i < BW / L; i++) {
+				debug("loop: %d", i);
+				vec ta; ta.load(&w.a[L*i]);
+				vec va = (ta<<1) | (ca>>7);
+				vec vb; vb.load(&w.b[L*i]);
+				ca = ta; va.store(&w.a[L*i]);
+
+				vec scv = vec::comp(va, vb).select(m, x);
+				scv.print();
+
+				/* load pv */
+				vec vd; vd.load(&w.pv[L*i]);
+				vd.print();
+
+				/* load v and h */
+				vec tv; tv.load(&w.cv[L*i]);
+				vec vh = tv; tv.store(&w.pv[L*i]);
+				vec vv = (tv<<1) | (cv>>7);
+				cv = tv;
+				vv.print();
+				vh.print();
+
+				/* load f and e */
+				vec ve; ve.load(&w.ce[L*i]);
+				vec tf; tf.load(&w.cf[L*i]);
+				vec vf = (tf<<1) | (cf>>7);
+				vf.print();
+				ve.print();
+
+				/* update e and f */
+				vec ne = vec::max(vh + giv, ve + gev);
+				vec nf = vec::max(vv + giv, vf + gev);
+				ne.store(&w.ce[L*i]);
+				nf.store(&w.cf[L*i]);
+
+				/* update s */
+				vec nv = vec::max(vec::max(ne, nf), vd + scv);
+				nv.store(&w.cv[L*i]);
+				nv.store(&ptr[L*i]);
+
+				vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
+				t.store(&maxv[L*i]); t.print();
+			}
+		}
+	}
+	free(mat);
+
+	int32_t max = 0;
+	for(int i = 0; i < BW / L; i++) {
+		vec t; t.load(&maxv[L*i]);
+		t.print();
+		debug("%d", t.hmax());
+		if(t.hmax() > max) { max = t.hmax(); }
+	}
+	return(max - OFS);
+}
+
+int main(void)
+{
+	char const *a = "abefpppghijkl";
+	char const *b = "abcdefpppijkl";
+
+	int sl = diag_linear(a, strlen(a), b, strlen(b), 2, -3, -5, -1);
+	printf("%d\n", sl);
+
+	int sa = diag_affine(a, strlen(a), b, strlen(b), 2, -3, -5, -1);
+	printf("%d\n", sa);
+
+	return(0);
+}
+
+/**
+ * end of diag.cc
+ */
