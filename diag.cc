@@ -9,7 +9,7 @@
 #include "sse.h"
 #include "util.h"
 
-#define BW		( 8 )
+#define BW		( 128 )
 #define MIN 	( 0 )
 #define OFS 	( 32768 )
 
@@ -45,42 +45,46 @@ diag_linear(
 	uint16_t maxv[BW] __attribute__(( aligned(16) ));
 
 	/* init char vec */
-	for(int i = 0; i < BW/2; i++) {
+	for(int i = 0; i < (int)BW/2; i++) {
 		w.a[BW/2 + i] = 0x80;
 		w.b[i] = 0xff;
 	}
-	for(int i = 0; i < BW/2; i++) {
+	for(int i = 0; i < (int)BW/2; i++) {
 		w.a[BW/2 - i - 1] = a[i];
 		w.b[BW/2 + i] = b[i];
 	}
 
 	/* init vec */
 	#define _Q(x)		( (x) - BW/2 )
-	for(int i = 0; i < BW; i++) {
+	for(int i = 0; i < (int)BW; i++) {
 		w.pv[i] =      (_Q(i) < 0 ? -_Q(i)   : _Q(i)) * (2*gi - m) + OFS;
 		w.cv[i] = gi + (_Q(i) < 0 ? -_Q(i)-1 : _Q(i)) * (2*gi - m) + OFS;
 		debug("pv(%d), cv(%d)", w.pv[i], w.cv[i]);
 	}
 	#undef _Q
 
+	/* init pad */
+	for(int i = 0; i < 8; i++) {
+		w.pad1[i] = 0; w.pad2[i] = 0; w.pad3[i] = 0;
+	}
+
 	/* init maxv */
-	for(int i = 0; i < BW; i++) {
+	for(int i = 0; i < (int)BW; i++) {
 		maxv[i] = 0;
 	}
 
 	uint64_t apos = BW/2;
 	uint64_t bpos = BW/2;
 	uint64_t const L = vec::LEN;
-	vec mv(m), xv(x), giv(gi);
-	for(int p = 0; p < MIN3(2*alen, alen+blen, 2*blen)-1; p++) {
+	vec mv(m), xv(x), giv(-gi);
+	for(int p = 0; p < (int)MIN3(2*alen, alen+blen, 2*blen)-1; p++) {
 		if((p & 0x01) == 0x01)  {
 //			debug("go down");
 			w.pad1[0] = b[bpos++];
-			w.pad3[0] = MIN - gi;
 
 			vec cb; cb.load(w.b);
 			vec ch; ch.load(w.cv);
-			for(int i = 0; i < BW / L; i++) {
+			for(int i = 0; i < (int)(BW / L); i++) {
 				debug("loop: %d", i);
 				vec va; va.load(&w.a[L*i]);
 				vec tb; tb.load(&w.b[L*(i+1)]);
@@ -88,7 +92,6 @@ diag_linear(
 				cb = tb; vb.store(&w.b[L*i]);
 
 				vec scv = vec::comp(va, vb).select(mv, xv);
-				scv.print();
 
 				vec vd; vd.load(&w.pv[L*i]);
 				vec th; th.load(&w.cv[L*(i+1)]);
@@ -96,22 +99,20 @@ diag_linear(
 				vec vh = (th<<7) | (ch>>1);
 				ch = th;
 
-				vec nv = vec::max(vec::max(vh, vv) + giv, vd + scv);
+				vec nv = vec::max(vec::max(vh, vv) - giv, vd + scv);
 				nv.store(&w.cv[L*i]);
 				nv.store(&ptr[L*i]);
 
 				vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
-				t.store(&maxv[L*i]); t.print();
-
-				vd.print(); vv.print(); vh.print(); nv.print();
+				t.store(&maxv[L*i]);
 			}
 		} else {
 //			debug("go right");
 			w.pad1[7] = a[apos++];
 
 			vec ca; ca.load(w.pad1);
-			vec cv; cv.ins(MIN - gi, 7);
-			for(int i = 0; i < BW / L; i++) {
+			vec cv; cv.zero();
+			for(int i = 0; i < (int)(BW / L); i++) {
 				debug("loop: %d", i);
 				vec ta; ta.load(&w.a[L*i]);
 				vec va = (ta<<1) | (ca>>7);
@@ -119,7 +120,6 @@ diag_linear(
 				ca = ta; va.store(&w.a[L*i]);
 
 				vec scv = vec::comp(va, vb).select(m, x);
-				scv.print();
 
 				vec vd; vd.load(&w.pv[L*i]);
 				vec tv; tv.load(&w.cv[L*i]);
@@ -127,14 +127,12 @@ diag_linear(
 				vec vv = (tv<<1) | (cv>>7);
 				cv = tv;
 
-				vec nv = vec::max(vec::max(vh, vv) + giv, vd + scv);
+				vec nv = vec::max(vec::max(vh, vv) - giv, vd + scv);
 				nv.store(&w.cv[L*i]);
 				nv.store(&ptr[L*i]);
 
 				vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
-				t.store(&maxv[L*i]); t.print();
-
-				vd.print(); vv.print(); vh.print(); nv.print();
+				t.store(&maxv[L*i]);
 			}
 		}
 		ptr += BW;
@@ -142,9 +140,8 @@ diag_linear(
 	free(mat);
 
 	int32_t max = 0;
-	for(int i = 0; i < BW / L; i++) {
+	for(int i = 0; i < (int)(BW / L); i++) {
 		vec t; t.load(&maxv[L*i]);
-		t.print();
 		debug("%d", t.hmax());
 		if(t.hmax() > max) { max = t.hmax(); }
 	}
@@ -182,18 +179,18 @@ diag_affine(
 	uint16_t maxv[BW] __attribute__(( aligned(16) ));
 
 	/* init char vec */
-	for(int i = 0; i < BW/2; i++) {
+	for(int i = 0; i < (int)BW/2; i++) {
 		w.a[BW/2 + i] = 0x80;
 		w.b[i] = 0xff;
 	}
-	for(int i = 0; i < BW/2; i++) {
+	for(int i = 0; i < (int)BW/2; i++) {
 		w.a[BW/2 - i - 1] = a[i];
 		w.b[BW/2 + i] = b[i];
 	}
 
 	/* init vec */
 	#define _Q(x)		( (x) - BW/2 )
-	for(int i = 0; i < BW; i++) {
+	for(int i = 0; i < (int)BW; i++) {
 		w.pv[i] =      (_Q(i) < 0 ? -_Q(i)   : _Q(i)) * (2*gi - m) + OFS;
 		w.cv[i] = gi + (_Q(i) < 0 ? -_Q(i)-1 : _Q(i)) * (2*gi - m) + OFS;
 		w.ce[i] = gi + (_Q(i) < 0 ? -_Q(i)-1 : _Q(i)+1) * (2*gi - m) + OFS;
@@ -202,26 +199,30 @@ diag_affine(
 	}
 	#undef _Q
 
+	/* init pad */
+	for(int i = 0; i < 8; i++) {
+		w.pad1[i] = 0; w.pad2[i] = 0;
+		w.pad3[i] = 0; w.pad4[i] = 0;
+	}
+
 	/* init maxv */
-	for(int i = 0; i < BW; i++) {
+	for(int i = 0; i < (int)BW; i++) {
 		maxv[i] = 0;
 	}
 
 	uint64_t apos = BW/2;
 	uint64_t bpos = BW/2;
 	uint64_t const L = vec::LEN;
-	vec mv(m), xv(x), giv(gi), gev(ge);
-	for(int p = 0; p < MIN3(2*alen, alen+blen, 2*blen)-1; p++) {
+	vec mv(m), xv(x), giv(-gi), gev(-ge);
+	for(int p = 0; p < (int)MIN3(2*alen, alen+blen, 2*blen)-1; p++) {
 		if((p & 0x01) == 0x01)  {
 //			debug("go down");
 			w.pad1[0] = b[bpos++];
-			w.pad3[0] = MIN - gi;
-			w.pad4[0] = MIN - gi;
 
 			vec cb; cb.load(w.b);
 			vec ch; ch.load(w.cv);
 			vec ce; ce.load(w.ce);
-			for(int i = 0; i < BW / L; i++) {
+			for(int i = 0; i < (int)(BW / L); i++) {
 				debug("loop: %d", i);
 				vec va; va.load(&w.a[L*i]);
 				vec tb; tb.load(&w.b[L*(i+1)]);
@@ -229,31 +230,25 @@ diag_affine(
 				cb = tb; vb.store(&w.b[L*i]);
 
 				vec scv = vec::comp(va, vb).select(mv, xv);
-				scv.print();
 
 				/* load pv */
 				vec vd; vd.load(&w.pv[L*i]);
-				vd.print();
 
 				/* load v and h */
 				vec th; th.load(&w.cv[L*(i+1)]);
 				vec vv = ch; ch.store(&w.pv[L*i]);
 				vec vh = (th<<7) | (ch>>1);
 				ch = th;
-				vv.print();
-				vh.print();
 
 				/* load f and e */
 				vec te; te.load(&w.ce[L*(i+1)]);
 				vec vf; vf.load(&w.cf[L*i]);
 				vec ve = (te<<7) | (ce>>1);
 				ce = te;
-				vf.print();
-				ve.print();
 
 				/* update e and f */
-				vec ne = vec::max(vh + giv, ve + gev);
-				vec nf = vec::max(vv + giv, vf + gev);
+				vec ne = vec::max(vh - giv, ve - gev);
+				vec nf = vec::max(vv - giv, vf - gev);
 				ne.store(&w.ce[L*i]);
 				nf.store(&w.cf[L*i]);
 
@@ -263,16 +258,16 @@ diag_affine(
 				nv.store(&ptr[L*i]);
 
 				vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
-				t.store(&maxv[L*i]); t.print();
+				t.store(&maxv[L*i]);
 			}
 		} else {
 //			debug("go right");
 			w.pad1[7] = a[apos++];
 
 			vec ca; ca.load(w.pad1);
-			vec cv; cv.ins(MIN - gi, 7);
-			vec cf; cf.ins(MIN - gi, 7);
-			for(int i = 0; i < BW / L; i++) {
+			vec cv; cv.zero();
+			vec cf; cf.zero();
+			for(int i = 0; i < (int)(BW / L); i++) {
 				debug("loop: %d", i);
 				vec ta; ta.load(&w.a[L*i]);
 				vec va = (ta<<1) | (ca>>7);
@@ -280,30 +275,24 @@ diag_affine(
 				ca = ta; va.store(&w.a[L*i]);
 
 				vec scv = vec::comp(va, vb).select(m, x);
-				scv.print();
 
 				/* load pv */
 				vec vd; vd.load(&w.pv[L*i]);
-				vd.print();
 
 				/* load v and h */
 				vec tv; tv.load(&w.cv[L*i]);
 				vec vh = tv; tv.store(&w.pv[L*i]);
 				vec vv = (tv<<1) | (cv>>7);
 				cv = tv;
-				vv.print();
-				vh.print();
 
 				/* load f and e */
 				vec ve; ve.load(&w.ce[L*i]);
 				vec tf; tf.load(&w.cf[L*i]);
 				vec vf = (tf<<1) | (cf>>7);
-				vf.print();
-				ve.print();
 
 				/* update e and f */
-				vec ne = vec::max(vh + giv, ve + gev);
-				vec nf = vec::max(vv + giv, vf + gev);
+				vec ne = vec::max(vh - giv, ve - gev);
+				vec nf = vec::max(vv - giv, vf - gev);
 				ne.store(&w.ce[L*i]);
 				nf.store(&w.cf[L*i]);
 
@@ -313,26 +302,28 @@ diag_affine(
 				nv.store(&ptr[L*i]);
 
 				vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
-				t.store(&maxv[L*i]); t.print();
+				t.store(&maxv[L*i]);
 			}
 		}
 	}
 	free(mat);
 
 	int32_t max = 0;
-	for(int i = 0; i < BW / L; i++) {
+	for(int i = 0; i < (int)(BW / L); i++) {
 		vec t; t.load(&maxv[L*i]);
-		t.print();
 		debug("%d", t.hmax());
 		if(t.hmax() > max) { max = t.hmax(); }
 	}
 	return(max - OFS);
 }
 
+#ifdef DEBUG
 int main(void)
 {
-	char const *a = "abefpppghijkl";
-	char const *b = "abcdefpppijkl";
+	char const *a = "aabbcccc";
+	char const *b = "aacccc";
+	// char const *a = "abefpppbbqqqqghijkltttt";
+	// char const *b = "abcdefpppqqqqijklggtttt";
 
 	int sl = diag_linear(a, strlen(a), b, strlen(b), 2, -3, -5, -1);
 	printf("%d\n", sl);
@@ -342,6 +333,7 @@ int main(void)
 
 	return(0);
 }
+#endif
 
 /**
  * end of diag.cc

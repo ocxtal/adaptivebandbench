@@ -41,7 +41,7 @@ public:
 	void zero(void) {
 		v = _mm_setzero_si128();
 	}
-	void set(int8_t k) {
+	void set(int16_t k) {
 		v = _mm_set1_epi16(k);
 	}
 
@@ -60,7 +60,7 @@ public:
 	}
 	/* sub */
 	vec operator-(vec const &b) const {
-		return(vec(_mm_sub_epi16(v, b.get())));
+		return(vec(_mm_subs_epu16(v, b.get())));
 	}
 	/* and */
 	vec operator&(vec const &b) const {
@@ -69,6 +69,21 @@ public:
 	/* or */
 	vec operator|(vec const &b) const {
 		return(vec(_mm_or_si128(v, b.get())));
+	}
+	/* compare */
+	uint16_t operator<(vec const &b) const {
+		return(_mm_movemask_epi8(_mm_cmplt_epi16(v, b.get())));
+	}
+	uint16_t operator>(vec const &b) const {
+		return(_mm_movemask_epi8(_mm_cmpgt_epi16(v, b.get())));
+	}
+	uint16_t operator<=(vec const &b) const { return(~operator>(b)); }
+	uint16_t operator>=(vec const &b) const { return(~operator<(b)); }
+	uint16_t operator==(vec const &b) const {
+		return(_mm_movemask_epi8(_mm_cmpeq_epi16(v, b.get())));
+	}
+	uint16_t operator!=(vec const &b) const {
+		return(~_mm_movemask_epi8(_mm_cmpeq_epi16(v, b.get())));
 	}
 	/* shift left */
 	vec operator<<(int s) const {
@@ -154,6 +169,10 @@ public:
 	void loadu(void const *ptr) {
 		v = _mm_loadu_si128((__m128i *)ptr);
 	}
+	void load_expand(void const *ptr) {
+		uint64_t a = *((uint64_t *)ptr);
+		v = _mm_cvtepu8_epi16(_mm_cvtsi64_si128(a));
+	}
 	void store(void *ptr) const {
 		_mm_store_si128((__m128i *)ptr, v);
 	}
@@ -169,7 +188,7 @@ public:
 		uint16_t b[8] __attribute__(( aligned (16) ));
 		store(b);
 		fprintf(fp,
-			"[%02x %02x %02x %02x %02x %02x %02x %02x]\n",
+			"[%04x %04x %04x %04x %04x %04x %04x %04x]\n",
 			b[7], b[6], b[5], b[4], b[3], b[2], b[1], b[0]);
 	}
 	#else
