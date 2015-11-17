@@ -40,7 +40,7 @@ blast_linear(
 	best_score = 0;
 
 	for(b_index = 1; b_index <= blen; b_index++) {
-		prev = ptr; ptr += (last_a_index - first_a_index);
+		prev = ptr; ptr += (last_a_index + 1 - first_a_index);
 		last_a_index = first_a_index;
 
 		score = MIN;
@@ -85,8 +85,8 @@ blast_linear(
 		if(last_a_index < a_size - 1) {
 			a_size = last_a_index + 1;
 		} else {
-			while((best_score - score > xt) && a_size <= alen) {
-				ptr[a_size] = score; score += gi; a_size++;
+			while((best_score - score <= xt) && a_size <= alen) {
+				ptr[a_size] = (score += gi); a_size++;
 			}
 			last_a_index = a_size;
 		}
@@ -134,7 +134,7 @@ blast_affine(
 	best_score = 0;
 
 	for(b_index = 1; b_index <= blen; b_index++) {
-		prev = ptr; ptr += (last_a_index - first_a_index);
+		prev = ptr; ptr += (last_a_index + 1 - first_a_index);
 		last_a_index = first_a_index;
 
 		score = MIN;
@@ -187,10 +187,9 @@ blast_affine(
 		if(last_a_index < a_size - 1) {
 			a_size = last_a_index + 1;
 		} else {
-			while((best_score - score > xt) && a_size <= alen) {
-				ptr[a_size].best = score;
-				ptr[a_size].best_gap = score_gap_row;
-				score += gi; score_gap_row += ge;
+			while((best_score - score <= xt) && a_size <= alen) {
+				ptr[a_size].best = (score += gi);
+				ptr[a_size].best_gap = (score_gap_row += ge);
 				if(score < score_gap_row) { score = score_gap_row; }
 				a_size++;
 			}
@@ -207,7 +206,7 @@ blast_affine(
 	return(best_score);
 }
 
-#ifdef DEBUG
+#ifdef MAIN
 int main(void)
 {
 	char const *a = "aabbcccccc";

@@ -9,7 +9,7 @@
 #include "sse.h"
 #include "util.h"
 
-#define BW		( 128 )
+#define BW		( 32 )
 #define MIN 	( 0 )
 #define OFS 	( 32768 )
 
@@ -317,7 +317,7 @@ diag_affine(
 	return(max - OFS);
 }
 
-#ifdef DEBUG
+#ifdef MAIN
 int main(void)
 {
 	char const *a = "aabbcccc";

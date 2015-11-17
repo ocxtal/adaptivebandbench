@@ -20,6 +20,33 @@ int rognes_affine(
 	char const *b,
 	uint64_t blen,
 	int8_t m, int8_t x, int8_t gi, int8_t ge);
+
+int blast_linear(
+	char const *a,
+	uint64_t alen,
+	char const *b,
+	uint64_t blen,
+	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
+int blast_affine(
+	char const *a,
+	uint64_t alen,
+	char const *b,
+	uint64_t blen,
+	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
+
+int simdblast_linear(
+	char const *a,
+	uint64_t alen,
+	char const *b,
+	uint64_t blen,
+	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
+int simdblast_affine(
+	char const *a,
+	uint64_t alen,
+	char const *b,
+	uint64_t blen,
+	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
+
 int diag_linear(
 	char const *a,
 	uint64_t alen,
@@ -33,6 +60,18 @@ int diag_affine(
 	uint64_t blen,
 	int8_t m, int8_t x, int8_t gi, int8_t ge);
 
+int ddiag_linear(
+	char const *a,
+	uint64_t alen,
+	char const *b,
+	uint64_t blen,
+	int8_t m, int8_t x, int8_t gi, int8_t ge);
+int ddiag_affine(
+	char const *a,
+	uint64_t alen,
+	char const *b,
+	uint64_t blen,
+	int8_t m, int8_t x, int8_t gi, int8_t ge);
 
 
 /**
@@ -85,10 +124,11 @@ char *mseq(char const *seq, int x, int ins, int del)
 int main(int argc, char *argv[])
 {
 	int i;
+	int const m = 2, x = -3, gi = -5, ge = -5;
 	char *a, *b, *at, *bt;
 	int len = (argc > 1) ? atoi(argv[1]) : 1000;
 	int cnt = (argc > 2) ? atoi(argv[2]) : 1000;
-	bench_t rl, ra, dl, da;
+	bench_t rl, ra, bl, ba, sl, sa, dl, da;
 	struct timeval tv;
 
 	gettimeofday(&tv, NULL);
@@ -106,41 +146,94 @@ int main(int argc, char *argv[])
 //	printf("%s\n%s\n", a, b);
 
 	printf("len:\t%d\ncnt:\t%d\n", len, cnt);
-
+	printf("m: %d\tx: %d\tgi: %d\tge: %d\n", m, x, gi, ge);
+	printf("alg\tlinear\taffine\n");
+#if 0
 	/* rognes */
 	bench_init(rl);
 	bench_init(ra);
 	bench_start(rl);
 	for(i = 0; i < cnt; i++) {
-		rognes_linear(a, strlen(a), b, strlen(b), 2, -3, -5, -1);
+		rognes_linear(a, strlen(a), b, strlen(b), m, x, gi, ge);
 	}
 	bench_end(rl);
 	bench_start(ra);
 	for(i = 0; i < cnt; i++) {
-		rognes_affine(a, strlen(a), b, strlen(b), 2, -3, -5, -1);
+		rognes_affine(a, strlen(a), b, strlen(b), m, x, gi, ge);
 	}
 	bench_end(ra);
 	printf("rognes:\t%lld\t%lld\n",
 		bench_get(rl) / 1000,
 		bench_get(ra) / 1000);
 
+	/* blast */
+	bench_init(bl);
+	bench_init(ba);
+	bench_start(bl);
+	for(i = 0; i < cnt; i++) {
+		blast_linear(a, strlen(a), b, strlen(b), m, x, gi, ge, 100);
+	}
+	bench_end(bl);
+	bench_start(ba);
+	for(i = 0; i < cnt; i++) {
+		blast_affine(a, strlen(a), b, strlen(b), m, x, gi, ge, 100);
+	}
+	bench_end(ba);
+	printf("blast:\t%lld\t%lld\n",
+		bench_get(bl) / 1000,
+		bench_get(ba) / 1000);
+#endif
+	/* simdblast */
+	bench_init(sl);
+	bench_init(sa);
+	bench_start(sl);
+	for(i = 0; i < cnt; i++) {
+		simdblast_linear(a, strlen(a), b, strlen(b), m, x, gi, ge, 100);
+	}
+	bench_end(sl);
+	bench_start(sa);
+	for(i = 0; i < cnt; i++) {
+		simdblast_affine(a, strlen(a), b, strlen(b), m, x, gi, ge, 100);
+	}
+	bench_end(sa);
+	printf("simd:\t%lld\t%lld\n",
+		bench_get(sl) / 1000,
+		bench_get(sa) / 1000);
+#if 0
 	/* diag */
 	bench_init(dl);
 	bench_init(da);
 	bench_start(dl);
 	for(i = 0; i < cnt; i++) {
-		diag_linear(a, strlen(a), b, strlen(b), 2, -3, -5, -1);
+		diag_linear(a, strlen(a), b, strlen(b), m, x, gi, ge);
 	}
 	bench_end(dl);
 	bench_start(da);
 	for(i = 0; i < cnt; i++) {
-		diag_affine(a, strlen(a), b, strlen(b), 2, -3, -5, -1);
+		diag_affine(a, strlen(a), b, strlen(b), m, x, gi, ge);
 	}
 	bench_end(da);
 	printf("diag:\t%lld\t%lld\n",
 		bench_get(dl) / 1000,
 		bench_get(da) / 1000);
 
+	/* dynamic diag */
+	bench_init(dl);
+	bench_init(da);
+	bench_start(dl);
+	for(i = 0; i < cnt; i++) {
+		ddiag_linear(a, strlen(a), b, strlen(b), m, x, gi, ge);
+	}
+	bench_end(dl);
+	bench_start(da);
+	for(i = 0; i < cnt; i++) {
+		ddiag_affine(a, strlen(a), b, strlen(b), m, x, gi, ge);
+	}
+	bench_end(da);
+	printf("ddiag:\t%lld\t%lld\n",
+		bench_get(dl) / 1000,
+		bench_get(da) / 1000);
+#endif
 	free(a);
 	free(b);
 	return 0;

@@ -38,55 +38,55 @@ public:
 	}
 
 	/* setter */
-	void zero(void) {
+	inline void zero(void) {
 		v = _mm_setzero_si128();
 	}
-	void set(int16_t k) {
+	inline void set(int16_t k) {
 		v = _mm_set1_epi16(k);
 	}
 
 	/* getter */
-	__m128i const &get(void) const { return(v); }
+	inline __m128i const &get(void) const { return(v); }
 
 	/* assign */
-	vec operator=(vec const &b) {
+	inline vec operator=(vec const &b) {
 		return(vec(v = b.get()));
 	}
 	/* cast */
 
 	/* add */
-	vec operator+(vec const &b) const {
+	inline vec operator+(vec const &b) const {
 		return(vec(_mm_add_epi16(v, b.get())));
 	}
 	/* sub */
-	vec operator-(vec const &b) const {
+	inline vec operator-(vec const &b) const {
 		return(vec(_mm_subs_epu16(v, b.get())));
 	}
 	/* and */
-	vec operator&(vec const &b) const {
+	inline vec operator&(vec const &b) const {
 		return(vec(_mm_and_si128(v, b.get())));
 	}
 	/* or */
-	vec operator|(vec const &b) const {
+	inline vec operator|(vec const &b) const {
 		return(vec(_mm_or_si128(v, b.get())));
 	}
 	/* compare */
-	uint16_t operator<(vec const &b) const {
+	inline uint16_t operator<(vec const &b) const {
 		return(_mm_movemask_epi8(_mm_cmplt_epi16(v, b.get())));
 	}
-	uint16_t operator>(vec const &b) const {
+	inline uint16_t operator>(vec const &b) const {
 		return(_mm_movemask_epi8(_mm_cmpgt_epi16(v, b.get())));
 	}
-	uint16_t operator<=(vec const &b) const { return(~operator>(b)); }
-	uint16_t operator>=(vec const &b) const { return(~operator<(b)); }
-	uint16_t operator==(vec const &b) const {
+	inline uint16_t operator<=(vec const &b) const { return(~operator>(b)); }
+	inline uint16_t operator>=(vec const &b) const { return(~operator<(b)); }
+	inline uint16_t operator==(vec const &b) const {
 		return(_mm_movemask_epi8(_mm_cmpeq_epi16(v, b.get())));
 	}
-	uint16_t operator!=(vec const &b) const {
+	inline uint16_t operator!=(vec const &b) const {
 		return(~_mm_movemask_epi8(_mm_cmpeq_epi16(v, b.get())));
 	}
 	/* shift left */
-	vec operator<<(int s) const {
+	inline vec operator<<(int s) const {
 		switch(s) {
 		#define l(n) c(n+1) c(n+2) c(n+3) c(n+4) c(n+5) c(n+6) c(n+7)
 			case 0: return(vec(v));
@@ -97,7 +97,7 @@ public:
 		#undef l
 		}
 	}
-	vec operator>>(int s) const {
+	inline vec operator>>(int s) const {
 		switch(s) {
 		#define l(n) c(n+1) c(n+2) c(n+3) c(n+4) c(n+5) c(n+6) c(n+7)
 			case 0: return(vec(v));
@@ -109,24 +109,24 @@ public:
 		}
 	}
 	/* binary assign */
-	vec operator+=(vec const &b) { return(operator=(operator+(b))); }
-	vec operator-=(vec const &b) { return(operator=(operator-(b))); }
-	vec operator&=(vec const &b) { return(operator=(operator&(b))); }
-	vec operator|=(vec const &b) { return(operator=(operator|(b))); }
-	vec operator<<=(int s) { return(operator=(operator<<(s))); }
-	vec operator>>=(int s) { return(operator=(operator>>(s))); }
+	inline vec operator+=(vec const &b) { return(operator=(operator+(b))); }
+	inline vec operator-=(vec const &b) { return(operator=(operator-(b))); }
+	inline vec operator&=(vec const &b) { return(operator=(operator&(b))); }
+	inline vec operator|=(vec const &b) { return(operator=(operator|(b))); }
+	inline vec operator<<=(int s) { return(operator=(operator<<(s))); }
+	inline vec operator>>=(int s) { return(operator=(operator>>(s))); }
 	/* array */
-	uint16_t operator[](uint64_t i) const {
+	inline uint16_t operator[](uint64_t i) const {
 		if(i < 8) {
 			return((uint16_t)_mm_extract_epi16(v, i));
 		} else {
 			return(0);
 		}
 	}
-	uint16_t lsb(void) const { return(operator[](0)); }
-	uint16_t center(void) const { return(operator[](4)); }
-	uint16_t msb(void) const { return(operator[](7)); }
-	uint16_t ins(uint16_t k, uint64_t i) {
+	inline uint16_t lsb(void) const { return(operator[](0)); }
+	inline uint16_t center(void) const { return(operator[](4)); }
+	inline uint16_t msb(void) const { return(operator[](7)); }
+	inline uint16_t ins(uint16_t k, uint64_t i) {
 		if(i < 8) {
 			v = _mm_insert_epi16(v, k, i);
 		} else {
@@ -136,47 +136,47 @@ public:
 	}
 
 	/* compare and select */
-	vec static comp(vec const &a, vec const &b) {
+	inline vec static comp(vec const &a, vec const &b) {
 		return(vec(_mm_cmpeq_epi16(a.get(), b.get())));
 	}
-	vec select(uint16_t m, uint16_t x) const {
+	inline vec select(uint16_t m, uint16_t x) const {
 		__m128i mv = _mm_set1_epi16(m);
 		__m128i xv = _mm_set1_epi16(x);
 		return(vec(_mm_blendv_epi8(xv, mv, v)));
 	}
-	vec select(vec const &m, vec const &x) const {
+	inline vec select(vec const &m, vec const &x) const {
 		return(vec(_mm_blendv_epi8(x.get(), m.get(), v)));
 	}
 	/* make mask */
-	int64_t mask(void) const {
+	inline int64_t mask(void) const {
 		return(_mm_movemask_epi8(v));
 	}
 	/* max */
-	vec static max(vec const &a, vec const &b) {
+	inline vec static max(vec const &a, vec const &b) {
 		return(vec(_mm_max_epu16(a.get(), b.get())));
 	}
 	/* horizontal max */
-	uint16_t hmax(void) const {
+	inline uint16_t hmax(void) const {
 		__m128i t = _mm_max_epu16(v, _mm_srli_si128(v, 2));
 		t = _mm_max_epu16(t, _mm_srli_si128(t, 4));
 		t = _mm_max_epu16(t, _mm_srli_si128(t, 8));
 		return((uint16_t)_mm_extract_epi16(t, 0));
 	}
 	/* load and store */
-	void load(void const *ptr) {
+	inline void load(void const *ptr) {
 		v = _mm_load_si128((__m128i *)ptr);
 	}
-	void loadu(void const *ptr) {
+	inline void loadu(void const *ptr) {
 		v = _mm_loadu_si128((__m128i *)ptr);
 	}
-	void load_expand(void const *ptr) {
+	inline void load_expand(void const *ptr) {
 		uint64_t a = *((uint64_t *)ptr);
 		v = _mm_cvtepu8_epi16(_mm_cvtsi64_si128(a));
 	}
-	void store(void *ptr) const {
+	inline void store(void *ptr) const {
 		_mm_store_si128((__m128i *)ptr, v);
 	}
-	void storeu(void *ptr) const {
+	inline void storeu(void *ptr) const {
 		_mm_storeu_si128((__m128i *)ptr, v);
 	}
 	/* print */
