@@ -95,6 +95,7 @@ blast_linear(
 			ptr[a_size] = MIN; a_size++;
 		}
 	}
+	free(mat);
 
 	return(best_score);
 }
@@ -202,6 +203,7 @@ blast_affine(
 			a_size++;
 		}
 	}
+	free(mat);
 
 	return(best_score);
 }

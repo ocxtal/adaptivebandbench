@@ -151,6 +151,7 @@ simdblast_linear(
 */
 		best_score_v.set(best_temp_v.hmax());
 	}
+	free(mat);
 
 	return(best_score_v.hmax() - OFS);
 }
@@ -186,7 +187,7 @@ simdblast_affine(
 		int16_t best_gap[vec::LEN];
 	};
 	struct _dp *mat = (struct _dp *)aligned_malloc(
-		roundup(alen, vec::LEN) * roundup(blen, vec::LEN) * sizeof(struct _dp),
+		roundup(alen, vec::LEN) / vec::LEN * roundup(blen, vec::LEN) * sizeof(struct _dp),
 		vec::SIZE);
 	struct _dp *ptr = mat, *prev;
 
@@ -313,6 +314,7 @@ simdblast_affine(
 */
 		best_score_v.set(best_temp_v.hmax());
 	}
+	free(mat);
 
 	return(best_score_v.hmax() - OFS);
 }

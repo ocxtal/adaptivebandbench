@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
 	printf("len:\t%d\ncnt:\t%d\n", len, cnt);
 	printf("m: %d\tx: %d\tgi: %d\tge: %d\n", m, x, gi, ge);
 	printf("alg\tlinear\taffine\n");
-#if 0
+
 	/* rognes */
 	bench_init(rl);
 	bench_init(ra);
@@ -182,7 +182,7 @@ int main(int argc, char *argv[])
 	printf("blast:\t%lld\t%lld\n",
 		bench_get(bl) / 1000,
 		bench_get(ba) / 1000);
-#endif
+
 	/* simdblast */
 	bench_init(sl);
 	bench_init(sa);
@@ -199,7 +199,7 @@ int main(int argc, char *argv[])
 	printf("simd:\t%lld\t%lld\n",
 		bench_get(sl) / 1000,
 		bench_get(sa) / 1000);
-#if 0
+
 	/* diag */
 	bench_init(dl);
 	bench_init(da);
@@ -233,7 +233,7 @@ int main(int argc, char *argv[])
 	printf("ddiag:\t%lld\t%lld\n",
 		bench_get(dl) / 1000,
 		bench_get(da) / 1000);
-#endif
+
 	free(a);
 	free(b);
 	return 0;
