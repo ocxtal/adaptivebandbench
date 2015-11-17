@@ -45,11 +45,11 @@ diag_linear(
 	uint16_t maxv[BW] __attribute__(( aligned(16) ));
 
 	/* init char vec */
-	for(int i = 0; i < (int)BW/2; i++) {
+	for(uint64_t i = 0; i < (uint64_t)BW/2; i++) {
 		w.a[BW/2 + i] = 0x80;
 		w.b[i] = 0xff;
 	}
-	for(int i = 0; i < (int)BW/2; i++) {
+	for(uint64_t i = 0; i < (uint64_t)BW/2; i++) {
 		w.a[BW/2 - i - 1] = a[i];
 		w.b[BW/2 + i] = b[i];
 	}
@@ -64,12 +64,12 @@ diag_linear(
 	#undef _Q
 
 	/* init pad */
-	for(int i = 0; i < 8; i++) {
+	for(uint64_t i = 0; i < 8; i++) {
 		w.pad1[i] = 0; w.pad2[i] = 0; w.pad3[i] = 0;
 	}
 
 	/* init maxv */
-	for(int i = 0; i < (int)BW; i++) {
+	for(uint64_t i = 0; i < (uint64_t)BW; i++) {
 		maxv[i] = 0;
 	}
 
@@ -77,15 +77,15 @@ diag_linear(
 	uint64_t bpos = BW/2;
 	uint64_t const L = vec::LEN;
 	vec mv(m), xv(x), giv(-gi);
-	for(int p = 0; p < (int)MIN3(2*alen, alen+blen, 2*blen)-1; p++) {
+	for(uint64_t p = 0; p < (uint64_t)MIN3(2*alen, alen+blen, 2*blen)-1; p++) {
 		if((p & 0x01) == 0x01)  {
 //			debug("go down");
 			w.pad1[0] = b[bpos++];
 
 			vec cb; cb.load(w.b);
 			vec ch; ch.load(w.cv);
-			for(int i = 0; i < (int)(BW / L); i++) {
-				debug("loop: %d", i);
+			for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
+				debug("loop: %llu", i);
 				vec va; va.load(&w.a[L*i]);
 				vec tb; tb.load(&w.b[L*(i+1)]);
 				vec vb = (tb<<7) | (cb>>1);
@@ -112,8 +112,8 @@ diag_linear(
 
 			vec ca; ca.load(w.pad1);
 			vec cv; cv.zero();
-			for(int i = 0; i < (int)(BW / L); i++) {
-				debug("loop: %d", i);
+			for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
+				debug("loop: %llu", i);
 				vec ta; ta.load(&w.a[L*i]);
 				vec va = (ta<<1) | (ca>>7);
 				vec vb; vb.load(&w.b[L*i]);
@@ -140,11 +140,12 @@ diag_linear(
 	free(mat);
 
 	int32_t max = 0;
-	for(int i = 0; i < (int)(BW / L); i++) {
+	for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
 		vec t; t.load(&maxv[L*i]);
 		debug("%d", t.hmax());
 		if(t.hmax() > max) { max = t.hmax(); }
 	}
+	debug("%d", max - OFS);
 	return(max - OFS);
 }
 
@@ -179,11 +180,11 @@ diag_affine(
 	uint16_t maxv[BW] __attribute__(( aligned(16) ));
 
 	/* init char vec */
-	for(int i = 0; i < (int)BW/2; i++) {
+	for(uint64_t i = 0; i < (uint64_t)BW/2; i++) {
 		w.a[BW/2 + i] = 0x80;
 		w.b[i] = 0xff;
 	}
-	for(int i = 0; i < (int)BW/2; i++) {
+	for(uint64_t i = 0; i < (uint64_t)BW/2; i++) {
 		w.a[BW/2 - i - 1] = a[i];
 		w.b[BW/2 + i] = b[i];
 	}
@@ -200,13 +201,13 @@ diag_affine(
 	#undef _Q
 
 	/* init pad */
-	for(int i = 0; i < 8; i++) {
+	for(uint64_t i = 0; i < 8; i++) {
 		w.pad1[i] = 0; w.pad2[i] = 0;
 		w.pad3[i] = 0; w.pad4[i] = 0;
 	}
 
 	/* init maxv */
-	for(int i = 0; i < (int)BW; i++) {
+	for(uint64_t i = 0; i < (uint64_t)BW; i++) {
 		maxv[i] = 0;
 	}
 
@@ -214,7 +215,7 @@ diag_affine(
 	uint64_t bpos = BW/2;
 	uint64_t const L = vec::LEN;
 	vec mv(m), xv(x), giv(-gi), gev(-ge);
-	for(int p = 0; p < (int)MIN3(2*alen, alen+blen, 2*blen)-1; p++) {
+	for(uint64_t p = 0; p < (uint64_t)MIN3(2*alen, alen+blen, 2*blen)-1; p++) {
 		if((p & 0x01) == 0x01)  {
 //			debug("go down");
 			w.pad1[0] = b[bpos++];
@@ -222,8 +223,8 @@ diag_affine(
 			vec cb; cb.load(w.b);
 			vec ch; ch.load(w.cv);
 			vec ce; ce.load(w.ce);
-			for(int i = 0; i < (int)(BW / L); i++) {
-				debug("loop: %d", i);
+			for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
+				debug("loop: %llu", i);
 				vec va; va.load(&w.a[L*i]);
 				vec tb; tb.load(&w.b[L*(i+1)]);
 				vec vb = (tb<<7) | (cb>>1);
@@ -267,8 +268,8 @@ diag_affine(
 			vec ca; ca.load(w.pad1);
 			vec cv; cv.zero();
 			vec cf; cf.zero();
-			for(int i = 0; i < (int)(BW / L); i++) {
-				debug("loop: %d", i);
+			for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
+				debug("loop: %llu", i);
 				vec ta; ta.load(&w.a[L*i]);
 				vec va = (ta<<1) | (ca>>7);
 				vec vb; vb.load(&w.b[L*i]);
@@ -309,7 +310,7 @@ diag_affine(
 	free(mat);
 
 	int32_t max = 0;
-	for(int i = 0; i < (int)(BW / L); i++) {
+	for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
 		vec t; t.load(&maxv[L*i]);
 		debug("%d", t.hmax());
 		if(t.hmax() > max) { max = t.hmax(); }
@@ -318,12 +319,41 @@ diag_affine(
 }
 
 #ifdef MAIN
-int main(void)
+#include <stdlib.h>
+int main_ext(int argc, char *argv[])
 {
-	char const *a = "aabbcccc";
-	char const *b = "aacccc";
+	if(strcmp(argv[1], "linear") == 0) {
+		int score = diag_linear(
+			argv[2], strlen(argv[2]),
+			argv[3], strlen(argv[3]),
+			atoi(argv[4]),
+			atoi(argv[5]),
+			atoi(argv[6]),
+			atoi(argv[7]));
+		printf("%d\n", score);
+	} else if(strcmp(argv[1], "affine") == 0) {
+		int score = diag_affine(
+			argv[2], strlen(argv[2]),
+			argv[3], strlen(argv[3]),
+			atoi(argv[4]),
+			atoi(argv[5]),
+			atoi(argv[6]),
+			atoi(argv[7]));
+		printf("%d\n", score);
+	} else {
+		printf("./a.out linear AAA AAA 2 -3 -5 -1 30\n");
+	}
+	return(0);
+}
+
+int main(int argc, char *argv[])
+{
+	char const *a = "aabbcccccc";
+	char const *b = "aacccccc";
 	// char const *a = "abefpppbbqqqqghijkltttt";
 	// char const *b = "abcdefpppqqqqijklggtttt";
+
+	if(argc > 1) { return(main_ext(argc, argv)); }
 
 	int sl = diag_linear(a, strlen(a), b, strlen(b), 2, -3, -5, -1);
 	printf("%d\n", sl);

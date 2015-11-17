@@ -36,33 +36,33 @@ rognes_linear(
 	uint16_t maxv[2*BW] __attribute__(( aligned(16) ));
 
 	/* init char vec */
-	for(int i = 0; i < (int)BW; i++) { w.b[i] = 0; }
-	for(int i = 0; i < (int)BW; i++) { w.b[i+BW] = b[i]; }
+	for(uint64_t i = 0; i < (uint64_t)BW; i++) { w.b[i] = 0; }
+	for(uint64_t i = 0; i < (uint64_t)BW; i++) { w.b[i+BW] = b[i]; }
 
 	/* init vec */
-	for(int i = 0; i < (int)BW; i++) { w.pv[i] = -4*gi; }
-	for(int i = 0; i < (int)BW; i++) { w.pv[i+BW] = i * gi + OFS; }
+	for(uint64_t i = 0; i < (uint64_t)BW; i++) { w.pv[i] = -4*gi; }
+	for(uint64_t i = 0; i < (uint64_t)BW; i++) { w.pv[i+BW] = i * gi + OFS; }
 
 	/* init pad */
-	for(int i = 0; i < 8; i++) {
+	for(uint64_t i = 0; i < 8; i++) {
 		w.pad1[i] = 0; w.pad2[i] = 0;
 	}
 
 	/* init maxv */
-	for(int i = 0; i < 2*BW; i++) {
+	for(uint64_t i = 0; i < 2*BW; i++) {
 		maxv[i] = 0;
 	}
 
 	vec mv(m), xv(x), giv(-gi);
 
 	int16_t gsum[BW*3] __attribute__(( aligned (sizeof(__m128i)) ));
-	for(int i = 0; i < (int)BW; i++) { gsum[i] = -gi; }
-	for(int i = 0; i < (int)BW; i++) { gsum[i+BW] = -2*gi; }
-	for(int i = 0; i < (int)BW; i++) { gsum[i+2*BW] = -4*gi; }
+	for(uint64_t i = 0; i < (uint64_t)BW; i++) { gsum[i] = -gi; }
+	for(uint64_t i = 0; i < (uint64_t)BW; i++) { gsum[i+BW] = -2*gi; }
+	for(uint64_t i = 0; i < (uint64_t)BW; i++) { gsum[i+2*BW] = -4*gi; }
 
 	/* fill-in loop */
 	uint64_t const L = vec::LEN;
-	for(int p = 0; p < (int)MIN2(alen, blen); p++) {
+	for(uint64_t p = 0; p < (uint64_t)MIN2(alen, blen); p++) {
 		vec va; va.set(a[p]);
 		w.pad1[0] = b[p+BW];
 
@@ -71,7 +71,7 @@ rognes_linear(
 		vec cb; cb.load(w.b);
 		vec ch; ch.load(w.pv);
 		vec cv; cv.zero();
-		for(int i = 0; i < (int)(2*BW / L); i++) {
+		for(uint64_t i = 0; i < (uint64_t)(2*BW / L); i++) {
 			debug("i: %d", i);
 			vec scv = vec::comp(va, cb).select(mv, xv);
 
@@ -107,7 +107,7 @@ rognes_linear(
 	free(mat);
 
 	int32_t max = 0;
-	for(int i = 0; i < (int)(2*BW / L); i++) {
+	for(uint64_t i = 0; i < (uint64_t)(2*BW / L); i++) {
 		vec t; t.load(&maxv[L*i]);
 		debug("%d", t.hmax());
 		if(t.hmax() > max) { max = t.hmax(); }
@@ -143,37 +143,37 @@ rognes_affine(
 	uint16_t maxv[2*BW] __attribute__(( aligned(16) ));
 
 	/* init char vec */
-	for(int i = 0; i < (int)BW; i++) { w.b[i] = 0; }
-	for(int i = 0; i < (int)BW; i++) { w.b[i+BW] = b[i]; }
+	for(uint64_t i = 0; i < (uint64_t)BW; i++) { w.b[i] = 0; }
+	for(uint64_t i = 0; i < (uint64_t)BW; i++) { w.b[i+BW] = b[i]; }
 
 	/* init vec */
-	for(int i = 0; i < (int)BW; i++) {
+	for(uint64_t i = 0; i < (uint64_t)BW; i++) {
 		w.pv[i] = (BW-i) * (2*gi - m) + OFS;
 		w.pe[i] = (BW-i) * (2*gi - m) + OFS;
 	}
-	for(int i = 0; i < (int)BW; i++) {
+	for(uint64_t i = 0; i < (uint64_t)BW; i++) {
 		w.pv[i+BW] = i * gi + OFS;
 		w.pe[i+BW] = (i+1) * gi + OFS;
 	}
 
 	/* init pad */
-	for(int i = 0; i < 8; i++) {
+	for(uint64_t i = 0; i < 8; i++) {
 		w.pad1[i] = 0; w.pad2[i] = 0; w.pad3[i] = 0;
 	}
 
 	/* init maxv */
-	for(int i = 0; i < 2*BW; i++) {
+	for(uint64_t i = 0; i < 2*BW; i++) {
 		maxv[i] = 0;
 	}
 
 	vec mv(m), xv(x), giv(-gi), gev(-ge);
 
 	int16_t gsum[BW*3] __attribute__(( aligned (sizeof(__m128i)) ));
-	for(int i = 0; i < (int)BW; i++) { gsum[i] = -3*ge; }
+	for(uint64_t i = 0; i < (uint64_t)BW; i++) { gsum[i] = -3*ge; }
 
 	/* fill-in loop */
 	uint64_t const L = vec::LEN;
-	for(int p = 0; p < (int)MIN2(alen, blen); p++) {
+	for(uint64_t p = 0; p < (uint64_t)MIN2(alen, blen); p++) {
 		vec va; va.set(a[p]);
 		w.pad1[0] = b[p+BW];
 
@@ -184,7 +184,7 @@ rognes_affine(
 		vec ce; ce.load(w.pe);
 		vec cv; cv.zero();
 		vec cf; cf.zero();
-		for(int i = 0; i < (int)(2*BW / L); i++) {
+		for(uint64_t i = 0; i < (uint64_t)(2*BW / L); i++) {
 			debug("i: %d", i);
 			vec scv = vec::comp(va, cb).select(mv, xv);
 
@@ -236,7 +236,7 @@ rognes_affine(
 	free(mat);
 
 	int32_t max = 0;
-	for(int i = 0; i < (int)(2*BW / L); i++) {
+	for(uint64_t i = 0; i < (uint64_t)(2*BW / L); i++) {
 		vec t; t.load(&maxv[L*i]);
 		debug("%d", t.hmax());
 		if(t.hmax() > max) { max = t.hmax(); }
@@ -245,10 +245,41 @@ rognes_affine(
 }
 
 #ifdef MAIN
-int main(void)
+#include <stdlib.h>
+int main_ext(int argc, char *argv[])
 {
-	char const *a = "aabbccccdd";
-	char const *b = "aaccccdd";
+	if(strcmp(argv[1], "linear") == 0) {
+		int score = rognes_linear(
+			argv[2], strlen(argv[2]),
+			argv[3], strlen(argv[3]),
+			atoi(argv[4]),
+			atoi(argv[5]),
+			atoi(argv[6]),
+			atoi(argv[7]));
+		printf("%d\n", score);
+	} else if(strcmp(argv[1], "affine") == 0) {
+		int score = rognes_affine(
+			argv[2], strlen(argv[2]),
+			argv[3], strlen(argv[3]),
+			atoi(argv[4]),
+			atoi(argv[5]),
+			atoi(argv[6]),
+			atoi(argv[7]));
+		printf("%d\n", score);
+	} else {
+		printf("./a.out linear AAA AAA 2 -3 -5 -1 30\n");
+	}
+	return(0);
+}
+
+int main(int argc, char *argv[])
+{
+	char const *a = "aabbcccccc";
+	char const *b = "aacccccc";
+	// char const *a = "abefpppbbqqqqghijkltttt";
+	// char const *b = "abcdefpppqqqqijklggtttt";
+
+	if(argc > 1) { return(main_ext(argc, argv)); }
 
 	int sl = rognes_linear(a, strlen(a), b, strlen(b), 2, -3, -5, -1);
 	printf("%d\n", sl);

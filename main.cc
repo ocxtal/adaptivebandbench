@@ -5,8 +5,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+// #include <gperftools/profiler.h>
 #include <sys/time.h>
 #include "util.h"
+
+// #define ALL
 
 int rognes_linear(
 	char const *a,
@@ -142,13 +145,14 @@ int main(int argc, char *argv[])
 	bt = rseq(len / 10);
 	a = (char *)realloc(a, 2*len); strcat(a, at); free(at);
 	b = (char *)realloc(b, 2*len); strcat(b, bt); free(bt);
+	printf("%p, %p\n", a, b);
 
 //	printf("%s\n%s\n", a, b);
 
 	printf("len:\t%d\ncnt:\t%d\n", len, cnt);
 	printf("m: %d\tx: %d\tgi: %d\tge: %d\n", m, x, gi, ge);
 	printf("alg\tlinear\taffine\n");
-
+#ifdef ALL
 	/* rognes */
 	bench_init(rl);
 	bench_init(ra);
@@ -165,7 +169,7 @@ int main(int argc, char *argv[])
 	printf("rognes:\t%lld\t%lld\n",
 		bench_get(rl) / 1000,
 		bench_get(ra) / 1000);
-
+#endif
 	/* blast */
 	bench_init(bl);
 	bench_init(ba);
@@ -199,7 +203,7 @@ int main(int argc, char *argv[])
 	printf("simd:\t%lld\t%lld\n",
 		bench_get(sl) / 1000,
 		bench_get(sa) / 1000);
-
+#ifdef ALL
 	/* diag */
 	bench_init(dl);
 	bench_init(da);
@@ -233,7 +237,7 @@ int main(int argc, char *argv[])
 	printf("ddiag:\t%lld\t%lld\n",
 		bench_get(dl) / 1000,
 		bench_get(da) / 1000);
-
+#endif
 	free(a);
 	free(b);
 	return 0;

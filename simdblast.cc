@@ -6,6 +6,11 @@
  */
 #include <string.h>
 #include "sse.h"
+/*
+#define DEBUG
+#include "log.h"
+#undef DEBUG
+*/
 #include "util.h"
 
 #define BW		( 128 )
@@ -24,9 +29,9 @@ simdblast_linear(
 	uint64_t blen,
 	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
 {
-	int i, a_size, first_a_index, last_a_index, a_index, b_index;
+	uint64_t i, a_size, first_a_index, last_a_index, a_index, b_index;
 	vec const mv(m), xv(x), gv(-gi), gv2(-2*gi), gv4(-4*gi), xtv(xt), zv(0), ofsv(OFS);
-	int16_t acc_g[vec::LEN] __attribute__(( aligned(16) )) = {
+	int16_t const acc_g[vec::LEN] __attribute__(( aligned(16) )) = {
 		0,
 		-gi,
 		-2*gi,
@@ -43,7 +48,7 @@ simdblast_linear(
 	int16_t *ptr = mat, *prev;
 
 	/* init top row */
-	int16_t init[vec::LEN] __attribute__(( aligned(16) )) = {
+	int16_t const init[vec::LEN] __attribute__(( aligned(16) )) = {
 		OFS,
 		OFS + gi,
 		OFS + 2*gi,
@@ -77,7 +82,7 @@ simdblast_linear(
 		vec best_temp_v = best_score_v;
 		if(first_a_index != 0) { prev_pv = next_score_v; }
 
-		debug("loop b(%d), a_size(%d)", b_index, a_size);
+		debug("loop b(%llu), a_size(%llu)", b_index, a_size);
 		for(a_index = first_a_index; a_index < a_size; a_index += vec::LEN) {
 
 			/* load prev vector */
@@ -121,7 +126,7 @@ simdblast_linear(
 			prev_av = av;
 		}
 
-		debug("xdrop, first_a_index(%d), last_a_index(%d), a_size(%d)", first_a_index, last_a_index, a_size);
+		debug("xdrop, first_a_index(%llu), last_a_index(%llu), a_size(%llu)", first_a_index, last_a_index, a_size);
 		if(first_a_index == a_size) { break; }
 		if(last_a_index < a_size - vec::LEN) {
 			a_size = last_a_index + vec::LEN;
@@ -129,6 +134,7 @@ simdblast_linear(
 			best_score_v.print();
 			score_v.print();
 			vec acc_gv; acc_gv.load(acc_g);
+// #if 0
 			while((best_score_v - score_v <= xtv) && a_size <= roundup(alen, vec::LEN)) {
 				score_v = (score_v>>7) - gv;		/* vec::LEN == 8 */
 				score_v.set(score_v[0]);
@@ -141,6 +147,7 @@ simdblast_linear(
 				a_size += vec::LEN;
 				score_v.print();
 			}
+// #endif
 			// printf("a(%d), b(%d)\n", a_size, b_index);
 			last_a_index = a_size;
 		}
@@ -167,11 +174,11 @@ simdblast_affine(
 	uint64_t blen,
 	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
 {
-	int i, a_size, first_a_index, last_a_index, a_index, b_index;
+	uint64_t i, a_size, first_a_index, last_a_index, a_index, b_index;
 	/* gvはaffine gap costにあわせて書き換える */
 	vec const mv(m), xv(x), xtv(xt), zv(0), ofsv(OFS);
 	vec const giv(-gi), gev(-ge), giev(ge-gi), gev3(-3*ge), gev8(-8*ge);
-	int16_t acc_ge[vec::LEN] __attribute__(( aligned(16) )) = {
+	int16_t const acc_ge[vec::LEN] __attribute__(( aligned(16) )) = {
 		0,
 		-ge,
 		-2*ge,
@@ -189,10 +196,11 @@ simdblast_affine(
 	struct _dp *mat = (struct _dp *)aligned_malloc(
 		roundup(alen, vec::LEN) / vec::LEN * roundup(blen, vec::LEN) * sizeof(struct _dp),
 		vec::SIZE);
-	struct _dp *ptr = mat, *prev;
+	struct _dp *ptr = mat, *prev = mat + roundup(alen, vec::LEN) / vec::LEN;
+	// memset(mat, 0, roundup(alen, vec::LEN) / vec::LEN * roundup(blen, vec::LEN) * sizeof(struct _dp));
 
 	/* init top row */
-	int16_t init[vec::LEN] __attribute__(( aligned(16) )) = {
+	int16_t const init[vec::LEN] __attribute__(( aligned(16) )) = {
 		OFS,
 		OFS + gi,
 		OFS + gi + ge,
@@ -202,7 +210,7 @@ simdblast_affine(
 		OFS + gi + 5*ge,
 		OFS + gi + 6*ge
 	};
-	int16_t init_g[vec::LEN] __attribute__(( aligned(16) )) = {
+	int16_t const init_g[vec::LEN] __attribute__(( aligned(16) )) = {
 		OFS + gi - ge,
 		OFS + gi,
 		OFS + gi + ge,
@@ -229,6 +237,7 @@ simdblast_affine(
 	for(b_index = 1; b_index <= blen; b_index++) {
 		vec bv(b[b_index-1]);
 
+		// struct _dp *tmp = prev; prev = ptr; ptr = tmp;
 		prev = ptr; ptr += (last_a_index + 1 - first_a_index);
 		last_a_index = first_a_index;
 
@@ -238,7 +247,7 @@ simdblast_affine(
 		vec prev_av = zv;
 		vec best_temp_v = best_score_v;
 
-		debug("loop b(%d), a_size(%d)", b_index, a_size);
+		debug("loop b(%llu), first_a_index(%llu), a_size(%llu)", b_index, first_a_index, a_size);
 		for(a_index = first_a_index; a_index < a_size; a_index += vec::LEN) {
 
 			/* load prev vector */
@@ -254,6 +263,7 @@ simdblast_affine(
 
 			/* calc d */
 			score_v = prev_pv>>7 | pv<<1;
+			// vec av('A');
 			vec av; av.load_expand(&a[a_index]);
 			score_v += vec::comp(prev_av>>7 | av<<1, bv).select(mv, xv);
 			score_v = vec::max(score_v, score_gap_col_v);
@@ -286,7 +296,7 @@ simdblast_affine(
 			prev_av = av;
 		}
 
-		debug("xdrop, first_a_index(%d), last_a_index(%d), a_size(%d)", first_a_index, last_a_index, a_size);
+		debug("xdrop, first_a_index(%llu), last_a_index(%llu), a_size(%llu)", first_a_index, last_a_index, a_size);
 		if(first_a_index == a_size) { break; }
 		if(last_a_index < a_size - vec::LEN) {
 			a_size = last_a_index + vec::LEN;
@@ -320,12 +330,43 @@ simdblast_affine(
 }
 
 #ifdef MAIN
-int main(void)
+#include <stdlib.h>
+int main_ext(int argc, char *argv[])
+{
+	if(strcmp(argv[1], "linear") == 0) {
+		int score = simdblast_linear(
+			argv[2], strlen(argv[2]),
+			argv[3], strlen(argv[3]),
+			atoi(argv[4]),
+			atoi(argv[5]),
+			atoi(argv[6]),
+			atoi(argv[7]),
+			atoi(argv[8]));
+		printf("%d\n", score);
+	} else if(strcmp(argv[1], "affine") == 0) {
+		int score = simdblast_affine(
+			argv[2], strlen(argv[2]),
+			argv[3], strlen(argv[3]),
+			atoi(argv[4]),
+			atoi(argv[5]),
+			atoi(argv[6]),
+			atoi(argv[7]),
+			atoi(argv[8]));
+		printf("%d\n", score);
+	} else {
+		printf("./a.out linear AAA AAA 2 -3 -5 -1 30\n");
+	}
+	return(0);
+}
+
+int main(int argc, char *argv[])
 {
 	char const *a = "aabbcccccc";
 	char const *b = "aacccccc";
 	// char const *a = "abefpppbbqqqqghijkltttt";
 	// char const *b = "abcdefpppqqqqijklggtttt";
+
+	if(argc > 1) { return(main_ext(argc, argv)); }
 
 	int sl = simdblast_linear(a, strlen(a), b, strlen(b), 2, -3, -5, -1, 30);
 	printf("%d\n", sl);

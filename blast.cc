@@ -21,7 +21,7 @@ blast_linear(
 	uint64_t blen,
 	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
 {
-	int i, a_size, first_a_index, last_a_index, a_index, b_index;
+	uint64_t i, a_size, first_a_index, last_a_index, a_index, b_index;
 	int16_t best_score, score, next_score, score_gap_row, score_gap_col;
 
 	int16_t *mat = (int16_t *)malloc(alen * blen * sizeof(int16_t));
@@ -111,7 +111,7 @@ blast_affine(
 	uint64_t blen,
 	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
 {
-	int i, a_size, first_a_index, last_a_index, a_index, b_index;
+	uint64_t i, a_size, first_a_index, last_a_index, a_index, b_index;
 	int16_t best_score, score, next_score, score_gap_row, score_gap_col;
 
 	struct _dp {
@@ -209,12 +209,43 @@ blast_affine(
 }
 
 #ifdef MAIN
-int main(void)
+#include <stdlib.h>
+int main_ext(int argc, char *argv[])
+{
+	if(strcmp(argv[1], "linear") == 0) {
+		int score = blast_linear(
+			argv[2], strlen(argv[2]),
+			argv[3], strlen(argv[3]),
+			atoi(argv[4]),
+			atoi(argv[5]),
+			atoi(argv[6]),
+			atoi(argv[7]),
+			atoi(argv[8]));
+		printf("%d\n", score);
+	} else if(strcmp(argv[1], "affine") == 0) {
+		int score = blast_affine(
+			argv[2], strlen(argv[2]),
+			argv[3], strlen(argv[3]),
+			atoi(argv[4]),
+			atoi(argv[5]),
+			atoi(argv[6]),
+			atoi(argv[7]),
+			atoi(argv[8]));
+		printf("%d\n", score);
+	} else {
+		printf("./a.out linear AAA AAA 2 -3 -5 -1 30\n");
+	}
+	return(0);
+}
+
+int main(int argc, char *argv[])
 {
 	char const *a = "aabbcccccc";
 	char const *b = "aacccccc";
 	// char const *a = "abefpppbbqqqqghijkltttt";
 	// char const *b = "abcdefpppqqqqijklggtttt";
+
+	if(argc > 1) { return(main_ext(argc, argv)); }
 
 	int sl = blast_linear(a, strlen(a), b, strlen(b), 2, -3, -5, -1, 30);
 	printf("%d\n", sl);
