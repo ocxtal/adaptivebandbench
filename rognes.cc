@@ -23,7 +23,7 @@ rognes_linear(
 	int8_t m, int8_t x, int8_t gi, int8_t ge)
 {
 	uint16_t *mat = (uint16_t *)aligned_malloc(
-		MIN2(alen, blen) * 2 * BW * sizeof(uint16_t),
+		alen * 2 * BW * sizeof(uint16_t),
 		sizeof(__m128i));
 	uint16_t *ptr = mat;
 
@@ -40,7 +40,7 @@ rognes_linear(
 	for(uint64_t i = 0; i < (uint64_t)BW; i++) { w.b[i+BW] = b[i]; }
 
 	/* init vec */
-	for(uint64_t i = 0; i < (uint64_t)BW; i++) { w.pv[i] = -4*gi; }
+	for(uint64_t i = 0; i < (uint64_t)BW; i++) { w.pv[i] = -BW*gi; }
 	for(uint64_t i = 0; i < (uint64_t)BW; i++) { w.pv[i+BW] = i * gi + OFS; }
 
 	/* init pad */
@@ -62,18 +62,18 @@ rognes_linear(
 
 	/* fill-in loop */
 	uint64_t const L = vec::LEN;
-	for(uint64_t p = 0; p < (uint64_t)MIN2(alen, blen); p++) {
+	for(uint64_t p = 0; p < (uint64_t)alen; p++) {
 		vec va; va.set(a[p]);
 		w.pad1[0] = b[p+BW];
 
-		debug("p: %d", p);
+		debug("p: %llu", p);
 
 		vec cb; cb.load(w.b);
 		vec ch; ch.load(w.pv);
 		vec cv; cv.zero();
 		for(uint64_t i = 0; i < (uint64_t)(2*BW / L); i++) {
-			debug("i: %d", i);
-			vec scv = vec::comp(va, cb).select(mv, xv);
+			debug("i: %llu", i);
+			vec scv = vec::comp(va, cb).select(mv, xv); scv.print();
 
 			/* load char vec */
 			vec tb; tb.load(&w.b[L*(i+1)]);
@@ -86,7 +86,7 @@ rognes_linear(
 			vec vh = (th<<7) | (ch>>1);
 			ch = th;
 
-			vec nv = vec::max(vec::max(vh - giv, cv>>7), vd + scv);
+			vec nv = vec::max(vec::max(vh - giv, cv>>7), vd + scv); nv.print();
 			/* chain vertical */
 			vec g1; g1.load(&gsum[0]);
 			nv = vec::max((nv - g1)<<1, nv);
@@ -96,7 +96,7 @@ rognes_linear(
 			nv = vec::max((nv - g4)<<4, nv);
 			cv = nv - giv;
 
-			nv.store(&w.pv[L*i]);
+			nv.store(&w.pv[L*i]); nv.print();
 			nv.store(&ptr[L*i]);
 
 			vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
@@ -128,7 +128,7 @@ rognes_affine(
 {
 	/* init vectors */
 	uint16_t *mat = (uint16_t *)aligned_malloc(
-		MIN2(alen, blen) * 3 * 2 * BW * sizeof(uint16_t),
+		alen * 3 * 2 * BW * sizeof(uint16_t),
 		sizeof(__m128i));
 	uint16_t *ptr = mat;
 
@@ -173,11 +173,11 @@ rognes_affine(
 
 	/* fill-in loop */
 	uint64_t const L = vec::LEN;
-	for(uint64_t p = 0; p < (uint64_t)MIN2(alen, blen); p++) {
+	for(uint64_t p = 0; p < (uint64_t)alen; p++) {
 		vec va; va.set(a[p]);
 		w.pad1[0] = b[p+BW];
 
-		debug("p: %d", p);
+		debug("p: %llu", p);
 
 		vec cb; cb.load(w.b);
 		vec ch; ch.load(w.pv);
@@ -185,8 +185,8 @@ rognes_affine(
 		vec cv; cv.zero();
 		vec cf; cf.zero();
 		for(uint64_t i = 0; i < (uint64_t)(2*BW / L); i++) {
-			debug("i: %d", i);
-			vec scv = vec::comp(va, cb).select(mv, xv);
+			debug("i: %llu", i);
+			vec scv = vec::comp(va, cb).select(mv, xv); scv.print();
 
 			/* load char vec */
 			vec tb; tb.load(&w.b[L*(i+1)]);
@@ -208,7 +208,7 @@ rognes_affine(
 			ne.store(&ptr[L*i + 2*BW]);
 
 			// vec nv = vec::max(vec::max(vh - giv, cv>>7), vd + scv);
-			vec nv = vec::max(ne, vd + scv);
+			vec nv = vec::max(ne, vd + scv); nv.print();
 			/* chain vertical */
 			vec nf = vec::max(cf, cv)>>7;
 			nv = vec::max(nf, nv);
@@ -218,7 +218,7 @@ rognes_affine(
 			nv = vec::max(nf, nv);
 			vec g4; g4.load(&gsum[0]);
 			nf = vec::max(nv - giv - g4, nf - gev - g4)<<4;
-			nv = vec::max(nf, nv);
+			nv = vec::max(nf, nv); nv.print();
 
 			cv = nv - giv;
 			cf = nf - gev;

@@ -68,7 +68,7 @@ simdblast_linear(
 	a_size = last_a_index = i;
 	first_a_index = 0;
 	vec best_score_v = ofsv;
-	vec next_score_v;
+	vec next_score_v(gv4);
 
 	for(b_index = 1; b_index <= blen; b_index++) {
 		vec bv(b[b_index-1]);
@@ -222,10 +222,10 @@ simdblast_affine(
 	};
 	vec init_v; init_v.load(init);
 	vec init_gv; init_gv.load(init_g);
-	for(i = 0; i < roundup(alen, vec::LEN); i += vec::LEN) {
+	for(i = 0; i < roundup(alen, vec::LEN) / vec::LEN; i++) {
 		if((ofsv - init_v > xtv) == 0xffff) { break; }
-		init_v.store(ptr[i].best);
-		(init_v - giev).store(ptr[i].best_gap);
+		init_v.store(&ptr[i].best);
+		(init_v - giev).store(&ptr[i].best_gap);
 		init_gv -= gev8; init_v = init_gv;
 	}
 
@@ -238,6 +238,7 @@ simdblast_affine(
 		vec bv(b[b_index-1]);
 
 		// struct _dp *tmp = prev; prev = ptr; ptr = tmp;
+		// prev = ptr; ptr += (last_a_index + vec::LEN - first_a_index) / vec::LEN;
 		prev = ptr; ptr += (last_a_index + 1 - first_a_index);
 		last_a_index = first_a_index;
 
@@ -248,11 +249,11 @@ simdblast_affine(
 		vec best_temp_v = best_score_v;
 
 		debug("loop b(%llu), first_a_index(%llu), a_size(%llu)", b_index, first_a_index, a_size);
-		for(a_index = first_a_index; a_index < a_size; a_index += vec::LEN) {
+		for(a_index = first_a_index; a_index < a_size; a_index++) {
 
 			/* load prev vector */
-			vec pv; pv.load(prev[a_index].best);
-			vec pf; pf.load(prev[a_index].best_gap);
+			vec pv; pv.load(&prev[a_index].best);
+			vec pf; pf.load(&prev[a_index].best_gap);
 			pv.print();
 
 			/* calc f */
@@ -264,7 +265,7 @@ simdblast_affine(
 			/* calc d */
 			score_v = prev_pv>>7 | pv<<1;
 			// vec av('A');
-			vec av; av.load_expand(&a[a_index]);
+			vec av; av.load_expand(&a[a_index * vec::LEN]);
 			score_v += vec::comp(prev_av>>7 | av<<1, bv).select(mv, xv);
 			score_v = vec::max(score_v, score_gap_col_v);
 
@@ -275,20 +276,21 @@ simdblast_affine(
 			score_gap_row_v = vec::max(score_v - giv - gev, score_gap_row_v - gev - gev)<<2;
 			score_v = vec::max(score_v, score_gap_row_v);
 			score_gap_row_v = vec::max(score_v - giv - gev3, score_gap_row_v - gev - gev3)<<4;
-			score_v = vec::max(score_v, score_gap_row_v);
+			score_v = vec::max(score_v, score_gap_row_v); score_v.print();
 
 			/* xdrop test */
 			if((best_score_v - score_v > xtv) == 0xffff) {
-				zv.store(ptr[a_index].best);
-				zv.store(ptr[a_index].best_gap);
+				vec const xxv(-x);
+				xxv.store(&ptr[a_index].best);
+				xxv.store(&ptr[a_index].best_gap);
 				if(a_index == first_a_index) {
 					next_score_v = score_v;
-					first_a_index += vec::LEN;
+					first_a_index++;
 				}
 			} else {
 				last_a_index = a_index;
-				score_v.store(ptr[a_index].best);
-				score_gap_col_v.store(ptr[a_index].best_gap);
+				score_v.store(&ptr[a_index].best);
+				score_gap_col_v.store(&ptr[a_index].best_gap);
 				best_temp_v = vec::max(best_temp_v, score_v);
 			}
 
@@ -298,19 +300,19 @@ simdblast_affine(
 
 		debug("xdrop, first_a_index(%llu), last_a_index(%llu), a_size(%llu)", first_a_index, last_a_index, a_size);
 		if(first_a_index == a_size) { break; }
-		if(last_a_index < a_size - vec::LEN) {
-			a_size = last_a_index + vec::LEN;
+		if(last_a_index < a_size - 1) {
+			a_size = last_a_index + 1;
 		} else {
 			vec acc_gev; acc_gev.load(acc_ge);
 			score_v.print(); score_gap_row_v.print();
-			while((best_score_v - score_v <= xtv) && a_size <= roundup(alen, vec::LEN)) {
+			while((best_score_v - score_v <= xtv) && a_size <= roundup(alen, vec::LEN) / vec::LEN) {
 				score_v = vec::max(score_v - giv, score_gap_row_v - gev)>>7; score_v.print();
 				score_v.set(score_v[0]); score_v.print();
 				score_v -= acc_gev; score_v.print();
 				score_gap_row_v = score_v - giev;
-				score_v.store(ptr[a_size].best);
-				score_gap_row_v.store(ptr[a_size].best_gap);
-				a_size += vec::LEN;
+				score_v.store(&ptr[a_size].best);
+				score_gap_row_v.store(&ptr[a_size].best_gap);
+				a_size++;
 			}
 			// printf("a(%d), b(%d)\n", a_size, b_index);
 			last_a_index = a_size;

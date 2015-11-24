@@ -78,7 +78,7 @@ blast_linear(
 			score = prev_best + (a[a_index] == b[b_index-1] ? m : x);
 			if(score < score_gap_row) { score = score_gap_row; }
 
-			debug("(%d, %d), row(%d), col(%d), diag(%d)", a_index, b_index, score_gap_row, score_gap_col, score);
+			debug("(%llu, %llu), row(%d), col(%d), diag(%d)", a_index, b_index, score_gap_row, score_gap_col, score);
 		}
 
 		if(first_a_index == a_size) { break; }
@@ -123,6 +123,7 @@ blast_affine(
 
 	/* initialize top row */
 	ptr[0].best = (score = 0); ptr[0].best_gap = (gi - ge);
+	score += gi;
 	for(i = 1; i < alen; i++) {
 		if(0 - score > xt) { break; }
 		ptr[i].best = score; ptr[i].best_gap = score + (gi - ge);
@@ -157,7 +158,7 @@ blast_affine(
 			/* update d */
 			if(score < score_gap_col) { score = score_gap_col; }
 
-			debug("(%d, %d), row(%d), col(%d), diag(%d)", a_index, b_index, score_gap_row, score_gap_col, score);
+			debug("(%llu, %llu), row(%d), col(%d), diag(%d)", a_index, b_index, score_gap_row, score_gap_col, score);
 
 			debug("updated score(%d)", score);
 
