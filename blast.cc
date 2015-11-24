@@ -24,7 +24,7 @@ blast_linear(
 	uint64_t i, a_size, first_a_index, last_a_index, a_index, b_index;
 	int16_t best_score, score, next_score, score_gap_row, score_gap_col;
 
-	int16_t *mat = (int16_t *)malloc(alen * blen * sizeof(int16_t));
+	int16_t *mat = (int16_t *)malloc((alen + 2) * (blen + 1) * sizeof(int16_t));
 	int16_t *ptr = mat, *prev;
 
 	/* initialize top row */
@@ -118,7 +118,7 @@ blast_affine(
 		int16_t best;
 		int16_t best_gap;
 	};
-	struct _dp *mat = (struct _dp *)malloc(alen * blen * sizeof(struct _dp));
+	struct _dp *mat = (struct _dp *)malloc((alen + 2) * (blen + 1) * sizeof(struct _dp));
 	struct _dp *ptr = mat, *prev;
 
 	/* initialize top row */
