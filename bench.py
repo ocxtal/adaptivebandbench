@@ -3,8 +3,8 @@
 
 import subprocess
 
-pbsim_path = '/Users/suzukihajime/docs/src/dl/pbsim-1.0.3/src/'
-ref_path = '/Users/suzukihajime/docs/lab/oni/work/NC_000913.fna'
+pbsim_path = '/home/suzukihajime/src/pbsim-1.0.3/src/'
+ref_path = '/home/suzukihajime/oni/work/resource/NC_000913.fna'
 align_path = './a.out'
 # ./pbsim --data-type CLR --length-min 900 --length-max 1100 --accuracy-min 0.84 --accuracy-max 0.86 --model_qc ../data/model_qc_clr --length-mean 1000 --length-sd 100 --accuracy-mean 0.85 --accuracy-sd 0.01 ~/docs/oni/work/NC_000913.fna
 
@@ -42,14 +42,14 @@ def parse_maf(maf_path):
 
 def align(align_paths, algorithms, ref, read):
 	return([[int(subprocess.check_output([
-		path, alg, ref, read, '1', '-1', '-1', '-1', '30']).split()[0])
+		path, alg, ref, read, '2', '-3', '-5', '-1', '30']).split()[0])
 			for path in align_paths]
 			for alg in algorithms])
 
 
 def evaluate(pbsim_path, ref_path, algorithm, length, error_rate):
 
-	# pbsim(pbsim_path, ref_path, length, 20, error_rate)
+	pbsim(pbsim_path, ref_path, length, 20, error_rate)
 	pairs = parse_maf('./sd_0001.maf')
 
 	tot = 0
@@ -60,7 +60,7 @@ def evaluate(pbsim_path, ref_path, algorithm, length, error_rate):
 
 		ref = pair[0] + ''.join(['A' for i in range(100)])
 		read = pair[1] + ''.join(['T' for i in range(100)])
-
+		# print(ref, read)
 		scores = align(['./blast', './ddiag'], ['affine', 'linear'], ref, read)
 		succ = [1 if score[0] == score[1] else 0 for score in scores]
 		# print(scores, succ, acc)
