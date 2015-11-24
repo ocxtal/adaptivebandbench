@@ -25,13 +25,9 @@ ddiag_linear(
 	int8_t m, int8_t x, int8_t gi, int8_t ge)
 {
 	uint16_t *mat = (uint16_t *)aligned_malloc(
-		(MIN3(2*alen, alen+blen, 2*blen)+1) * BW * sizeof(uint16_t),
+		(alen+blen-1) * BW * sizeof(uint16_t),
 		sizeof(__m128i));
 	uint16_t *ptr = mat;
-
-	debug("%lld, %lld",
-		MIN3(2*alen, alen+blen, 2*blen),
-		MIN3(2*alen, alen+blen, 2*blen) * BW * sizeof(uint16_t));
 
 	struct _w {
 		uint16_t b[BW];
@@ -83,7 +79,7 @@ ddiag_linear(
 	uint64_t bpos = BW/2;
 	uint64_t const L = vec::LEN;
 	vec mv(m), xv(x), giv(-gi);
-	for(uint64_t p = 0; p < (uint64_t)MIN3(2*alen, alen+blen, 2*blen)+1; p++) {
+	for(uint64_t p = 0; p < (uint64_t)(alen+blen-1); p++) {
 		debug("%lld, %d, %d", dir, w.cv[BW-1], w.cv[0]);
 		dir = dir_trans[w.cv[BW-1] > w.cv[0]][dir];
 		switch(dir & 0x03) {
@@ -243,7 +239,7 @@ ddiag_affine(
 	int8_t m, int8_t x, int8_t gi, int8_t ge)
 {
 	uint16_t *mat = (uint16_t *)aligned_malloc(
-		(MIN3(2*alen, alen+blen, 2*blen)+1) * 3 * BW * sizeof(uint16_t),
+		(alen+blen-1) * 3 * BW * sizeof(uint16_t),
 		sizeof(__m128i));
 	uint16_t *ptr = mat;
 
@@ -302,7 +298,7 @@ ddiag_affine(
 	uint64_t bpos = BW/2;
 	uint64_t const L = vec::LEN;
 	vec mv(m), xv(x), giv(-gi), gev(-ge);
-	for(uint64_t p = 0; p < (uint64_t)MIN3(2*alen, alen+blen, 2*blen)+1; p++) {
+	for(uint64_t p = 0; p < (uint64_t)(alen+blen-1); p++) {
 		debug("%lld, %d, %d", dir, w.cv[BW-1], w.cv[0]);
 		dir = dir_trans[w.cv[BW-1] > w.cv[0]][dir];
 		switch(dir & 0x03) {

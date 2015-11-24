@@ -43,8 +43,9 @@ simdblast_linear(
 	};
 
 	int16_t *mat = (int16_t *)aligned_malloc(
-		roundup(alen, vec::LEN) * roundup(blen, vec::LEN) * sizeof(int16_t),
+		(roundup((alen + 1), vec::LEN) + 2*vec::LEN) * (blen + 1) * sizeof(int16_t),
 		vec::SIZE);
+	debug("%llu, %llu, %llu, %llu", alen, roundup((alen + 2), vec::LEN), (blen + 1), roundup((alen + 2), vec::LEN) * (blen + 1) * sizeof(int16_t));
 	int16_t *ptr = mat, *prev;
 
 	/* init top row */
@@ -111,7 +112,8 @@ simdblast_linear(
 
 			/* xdrop test */
 			if((best_score_v - score_v > xtv) == 0xffff) {
-				zv.store(&ptr[a_index]);
+				vec const xxv(-x);
+				xxv.store(&ptr[a_index]);
 				if(a_index == first_a_index) {
 					next_score_v = score_v;
 					first_a_index += vec::LEN;
@@ -135,7 +137,7 @@ simdblast_linear(
 			score_v.print();
 			vec acc_gv; acc_gv.load(acc_g);
 // #if 0
-			while((best_score_v - score_v <= xtv) && a_size <= roundup(alen, vec::LEN)) {
+			while((best_score_v - score_v <= xtv) && a_size <= roundup(alen + 1, vec::LEN)) {
 				score_v = (score_v>>7) - gv;		/* vec::LEN == 8 */
 				score_v.set(score_v[0]);
 				score_v -= acc_gv;
@@ -194,10 +196,12 @@ simdblast_affine(
 		int16_t best_gap[vec::LEN];
 	};
 	struct _dp *mat = (struct _dp *)aligned_malloc(
-		roundup(alen, vec::LEN) / vec::LEN * roundup(blen, vec::LEN) * sizeof(struct _dp),
+		(roundup(alen + 1, vec::LEN) / vec::LEN + 2) * (blen + 1) * sizeof(struct _dp),
 		vec::SIZE);
 	struct _dp *ptr = mat, *prev = mat + roundup(alen, vec::LEN) / vec::LEN;
 	// memset(mat, 0, roundup(alen, vec::LEN) / vec::LEN * roundup(blen, vec::LEN) * sizeof(struct _dp));
+
+	debug("%llu, %llu, %llu, %llu, %lu", alen, roundup((alen + 1), vec::LEN), roundup((alen + 1), vec::LEN) / vec::LEN + 1, blen, sizeof(struct _dp));
 
 	/* init top row */
 	int16_t const init[vec::LEN] __attribute__(( aligned(16) )) = {
@@ -222,12 +226,14 @@ simdblast_affine(
 	};
 	vec init_v; init_v.load(init);
 	vec init_gv; init_gv.load(init_g);
-	for(i = 0; i < roundup(alen, vec::LEN) / vec::LEN; i++) {
+	for(i = 0; i < roundup(alen + 1, vec::LEN) / vec::LEN; i++) {
 		if((ofsv - init_v > xtv) == 0xffff) { break; }
 		init_v.store(&ptr[i].best);
 		(init_v - giev).store(&ptr[i].best_gap);
 		init_gv -= gev8; init_v = init_gv;
 	}
+
+	debug("%llu", i);
 
 	a_size = last_a_index = i;
 	first_a_index = 0;
@@ -237,8 +243,7 @@ simdblast_affine(
 	for(b_index = 1; b_index <= blen; b_index++) {
 		vec bv(b[b_index-1]);
 
-		// struct _dp *tmp = prev; prev = ptr; ptr = tmp;
-		// prev = ptr; ptr += (last_a_index + vec::LEN - first_a_index) / vec::LEN;
+		debug("%llu", last_a_index + 1 - first_a_index);
 		prev = ptr; ptr += (last_a_index + 1 - first_a_index);
 		last_a_index = first_a_index;
 
@@ -305,7 +310,7 @@ simdblast_affine(
 		} else {
 			vec acc_gev; acc_gev.load(acc_ge);
 			score_v.print(); score_gap_row_v.print();
-			while((best_score_v - score_v <= xtv) && a_size <= roundup(alen, vec::LEN) / vec::LEN) {
+			while((best_score_v - score_v <= xtv) && a_size <= roundup(alen + 1, vec::LEN) / vec::LEN) {
 				score_v = vec::max(score_v - giv, score_gap_row_v - gev)>>7; score_v.print();
 				score_v.set(score_v[0]); score_v.print();
 				score_v -= acc_gev; score_v.print();
