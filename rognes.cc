@@ -7,7 +7,10 @@
 #include "sse.h"
 #include "util.h"
 
+#ifndef BW
 #define BW		( 32 )
+#endif
+
 #define MIN 	( 0 )
 #define OFS 	( 32768 )
 
