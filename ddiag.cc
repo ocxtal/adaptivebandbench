@@ -25,7 +25,7 @@ ddiag_linear(
 	int8_t m, int8_t x, int8_t gi, int8_t ge)
 {
 	uint16_t *mat = (uint16_t *)aligned_malloc(
-		(MIN3(2*alen, alen+blen, 2*blen)) * BW * sizeof(uint16_t),
+		(MIN3(2*alen, alen+blen, 2*blen)+1) * BW * sizeof(uint16_t),
 		sizeof(__m128i));
 	uint16_t *ptr = mat;
 
@@ -65,7 +65,7 @@ ddiag_linear(
 
 	/* init pad */
 	for(uint64_t i = 0; i < 8; i++) {
-		w.pad1[i] = 0; w.pad2[i] = -x; w.pad3[i] = 0;
+		w.pad1[i] = 0; w.pad2[i] = -x; w.pad3[i] = -gi;
 	}
 
 	/* init maxv */
@@ -83,7 +83,7 @@ ddiag_linear(
 	uint64_t bpos = BW/2;
 	uint64_t const L = vec::LEN;
 	vec mv(m), xv(x), giv(-gi);
-	for(uint64_t p = 0; p < (uint64_t)MIN3(2*alen, alen+blen, 2*blen)-1; p++) {
+	for(uint64_t p = 0; p < (uint64_t)MIN3(2*alen, alen+blen, 2*blen)+1; p++) {
 		debug("%lld, %d, %d", dir, w.cv[BW-1], w.cv[0]);
 		dir = dir_trans[w.cv[BW-1] > w.cv[0]][dir];
 		switch(dir & 0x03) {
@@ -95,7 +95,7 @@ ddiag_linear(
 				vec ch; ch.load(w.cv);
 				vec cd; cd.load(w.pv);
 				for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
-					debug("loop: %d", i);
+					debug("loop: %llu", i);
 					vec va; va.load(&w.a[L*i]);
 					vec tb; tb.load(&w.b[L*(i+1)]);
 					vec vb = (tb<<7) | (cb>>1);
@@ -130,7 +130,7 @@ ddiag_linear(
 				vec cb; cb.load(w.b);
 				vec ch; ch.load(w.cv);
 				for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
-					debug("loop: %d", i);
+					debug("loop: %llu", i);
 					vec va; va.load(&w.a[L*i]);
 					vec tb; tb.load(&w.b[L*(i+1)]);
 					vec vb = (tb<<7) | (cb>>1);
@@ -157,9 +157,9 @@ ddiag_linear(
 				w.pad1[7] = a[apos++];
 
 				vec ca; ca.load(w.pad1);
-				vec cv; cv.zero();
+				vec cv(-gi);
 				for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
-					debug("loop: %d", i);
+					debug("loop: %llu", i);
 					vec ta; ta.load(&w.a[L*i]);
 					vec va = (ta<<1) | (ca>>7);
 					vec vb; vb.load(&w.b[L*i]);
@@ -186,10 +186,10 @@ ddiag_linear(
 				w.pad1[7] = a[apos++];
 
 				vec ca; ca.load(w.pad1);
-				vec cv; cv.zero();
+				vec cv(-gi);
 				vec cd(-x);
 				for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
-					debug("loop: %d", i);
+					debug("loop: %llu", i);
 					vec ta; ta.load(&w.a[L*i]);
 					vec va = (ta<<1) | (ca>>7);
 					vec vb; vb.load(&w.b[L*i]);
@@ -243,7 +243,7 @@ ddiag_affine(
 	int8_t m, int8_t x, int8_t gi, int8_t ge)
 {
 	uint16_t *mat = (uint16_t *)aligned_malloc(
-		(MIN3(2*alen, alen+blen, 2*blen)) * 3 * BW * sizeof(uint16_t),
+		(MIN3(2*alen, alen+blen, 2*blen)+1) * 3 * BW * sizeof(uint16_t),
 		sizeof(__m128i));
 	uint16_t *ptr = mat;
 
@@ -284,8 +284,8 @@ ddiag_affine(
 
 	/* init pad */
 	for(uint64_t i = 0; i < 8; i++) {
-		w.pad1[i] = 0; w.pad2[i] = 0;
-		w.pad3[i] = 0; w.pad4[i] = 0;
+		w.pad1[i] = 0; w.pad2[i] = -x;
+		w.pad3[i] = -gi; w.pad4[i] = -ge;
 	}
 
 	/* init maxv */
@@ -302,7 +302,7 @@ ddiag_affine(
 	uint64_t bpos = BW/2;
 	uint64_t const L = vec::LEN;
 	vec mv(m), xv(x), giv(-gi), gev(-ge);
-	for(uint64_t p = 0; p < (uint64_t)MIN3(2*alen, alen+blen, 2*blen)-1; p++) {
+	for(uint64_t p = 0; p < (uint64_t)MIN3(2*alen, alen+blen, 2*blen)+1; p++) {
 		debug("%lld, %d, %d", dir, w.cv[BW-1], w.cv[0]);
 		dir = dir_trans[w.cv[BW-1] > w.cv[0]][dir];
 		switch(dir & 0x03) {
@@ -315,7 +315,7 @@ ddiag_affine(
 				vec ce; ce.load(w.ce);
 				vec cd; cd.load(w.pv);
 				for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
-					debug("loop: %d", i);
+					debug("loop: %llu", i);
 					vec va; va.load(&w.a[L*i]);
 					vec tb; tb.load(&w.b[L*(i+1)]);
 					vec vb = (tb<<7) | (cb>>1);
@@ -344,12 +344,12 @@ ddiag_affine(
 					/* update e and f */
 					vec ne = vec::max(vh - giv, ve - gev);
 					vec nf = vec::max(vv - giv, vf - gev);
-					ne.store(&w.ce[L*i]);
-					nf.store(&w.cf[L*i]);
+					ne.store(&w.ce[L*i]); ne.print();
+					nf.store(&w.cf[L*i]); nf.print();
 
 					/* update s */
 					vec nv = vec::max(vec::max(ne, nf), vd + scv);
-					nv.store(&w.cv[L*i]);
+					nv.store(&w.cv[L*i]); nv.print();
 					nv.store(&ptr[L*i]);
 
 					vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
@@ -364,7 +364,7 @@ ddiag_affine(
 				vec ch; ch.load(w.cv);
 				vec ce; ce.load(w.ce);
 				for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
-					debug("loop: %d", i);
+					debug("loop: %llu", i);
 					vec va; va.load(&w.a[L*i]);
 					vec tb; tb.load(&w.b[L*(i+1)]);
 					vec vb = (tb<<7) | (cb>>1);
@@ -390,12 +390,12 @@ ddiag_affine(
 					/* update e and f */
 					vec ne = vec::max(vh - giv, ve - gev);
 					vec nf = vec::max(vv - giv, vf - gev);
-					ne.store(&w.ce[L*i]);
-					nf.store(&w.cf[L*i]);
+					ne.store(&w.ce[L*i]); ne.print();
+					nf.store(&w.cf[L*i]); nf.print();
 
 					/* update s */
 					vec nv = vec::max(vec::max(ne, nf), vd + scv);
-					nv.store(&w.cv[L*i]);
+					nv.store(&w.cv[L*i]); nv.print();
 					nv.store(&ptr[L*i]);
 
 					vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
@@ -407,10 +407,10 @@ ddiag_affine(
 				w.pad1[7] = a[apos++];
 
 				vec ca; ca.load(w.pad1);
-				vec cv; cv.zero();
-				vec cf; cf.zero();
+				vec cv(-gi);
+				vec cf(-ge);
 				for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
-					debug("loop: %d", i);
+					debug("loop: %llu", i);
 					vec ta; ta.load(&w.a[L*i]);
 					vec va = (ta<<1) | (ca>>7);
 					vec vb; vb.load(&w.b[L*i]);
@@ -435,12 +435,12 @@ ddiag_affine(
 					/* update e and f */
 					vec ne = vec::max(vh - giv, ve - gev);
 					vec nf = vec::max(vv - giv, vf - gev);
-					ne.store(&w.ce[L*i]);
-					nf.store(&w.cf[L*i]);
+					ne.store(&w.ce[L*i]); ne.print();
+					nf.store(&w.cf[L*i]); nf.print();
 
 					/* update s */
 					vec nv = vec::max(vec::max(ne, nf), vd + scv);
-					nv.store(&w.cv[L*i]);
+					nv.store(&w.cv[L*i]); nv.print();
 					nv.store(&ptr[L*i]);
 
 					vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
@@ -452,11 +452,11 @@ ddiag_affine(
 				w.pad1[7] = a[apos++];
 
 				vec ca; ca.load(w.pad1);
-				vec cv; cv.zero();
-				vec cf; cf.zero();
+				vec cv(-gi);
+				vec cf(-ge);
 				vec cd(-x);
 				for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
-					debug("loop: %d", i);
+					debug("loop: %llu", i);
 					vec ta; ta.load(&w.a[L*i]);
 					vec va = (ta<<1) | (ca>>7);
 					vec vb; vb.load(&w.b[L*i]);
@@ -467,7 +467,7 @@ ddiag_affine(
 					/* load pv */
 					// vec vd; vd.load(&w.pv[L*i]);
 					vec td; td.load(&w.pv[L*i]);
-					vec vd = (td<<1) | (cv>>7);
+					vec vd = (td<<1) | (cd>>7);
 					cd = td;
 
 					/* load v and h */
@@ -484,12 +484,12 @@ ddiag_affine(
 					/* update e and f */
 					vec ne = vec::max(vh - giv, ve - gev);
 					vec nf = vec::max(vv - giv, vf - gev);
-					ne.store(&w.ce[L*i]);
-					nf.store(&w.cf[L*i]);
+					ne.store(&w.ce[L*i]); ne.print();
+					nf.store(&w.cf[L*i]); nf.print();
 
 					/* update s */
 					vec nv = vec::max(vec::max(ne, nf), vd + scv);
-					nv.store(&w.cv[L*i]);
+					nv.store(&w.cv[L*i]); nv.print();
 					nv.store(&ptr[L*i]);
 
 					vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);

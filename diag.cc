@@ -25,7 +25,7 @@ diag_linear(
 	int8_t m, int8_t x, int8_t gi, int8_t ge)
 {
 	uint16_t *mat = (uint16_t *)aligned_malloc(
-		(MIN3(2*alen, alen+blen, 2*blen)) * BW * sizeof(uint16_t),
+		(MIN3(2*alen, alen+blen, 2*blen)+1) * BW * sizeof(uint16_t),
 		sizeof(__m128i));
 	uint16_t *ptr = mat;
 
@@ -77,7 +77,7 @@ diag_linear(
 	uint64_t bpos = BW/2;
 	uint64_t const L = vec::LEN;
 	vec mv(m), xv(x), giv(-gi);
-	for(uint64_t p = 0; p < (uint64_t)MIN3(2*alen, alen+blen, 2*blen)-1; p++) {
+	for(uint64_t p = 0; p < (uint64_t)MIN3(2*alen, alen+blen, 2*blen)+1; p++) {
 		if((p & 0x01) == 0x01)  {
 //			debug("go down");
 			w.pad1[0] = b[bpos++];
@@ -100,7 +100,7 @@ diag_linear(
 				ch = th;
 
 				vec nv = vec::max(vec::max(vh, vv) - giv, vd + scv);
-				nv.store(&w.cv[L*i]);
+				nv.store(&w.cv[L*i]); nv.print();
 				nv.store(&ptr[L*i]);
 
 				vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
@@ -128,7 +128,7 @@ diag_linear(
 				cv = tv;
 
 				vec nv = vec::max(vec::max(vh, vv) - giv, vd + scv);
-				nv.store(&w.cv[L*i]);
+				nv.store(&w.cv[L*i]); nv.print();
 				nv.store(&ptr[L*i]);
 
 				vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
@@ -161,7 +161,7 @@ diag_affine(
 	int8_t m, int8_t x, int8_t gi, int8_t ge)
 {
 	uint16_t *mat = (uint16_t *)aligned_malloc(
-		(MIN3(2*alen, alen+blen, 2*blen)) * 3 * BW * sizeof(uint16_t),
+		(MIN3(2*alen, alen+blen, 2*blen)+1) * 3 * BW * sizeof(uint16_t),
 		sizeof(__m128i));
 	uint16_t *ptr = mat;
 
@@ -215,7 +215,7 @@ diag_affine(
 	uint64_t bpos = BW/2;
 	uint64_t const L = vec::LEN;
 	vec mv(m), xv(x), giv(-gi), gev(-ge);
-	for(uint64_t p = 0; p < (uint64_t)MIN3(2*alen, alen+blen, 2*blen)-1; p++) {
+	for(uint64_t p = 0; p < (uint64_t)MIN3(2*alen, alen+blen, 2*blen)+1; p++) {
 		if((p & 0x01) == 0x01)  {
 //			debug("go down");
 			w.pad1[0] = b[bpos++];
@@ -250,12 +250,12 @@ diag_affine(
 				/* update e and f */
 				vec ne = vec::max(vh - giv, ve - gev);
 				vec nf = vec::max(vv - giv, vf - gev);
-				ne.store(&w.ce[L*i]);
-				nf.store(&w.cf[L*i]);
+				ne.store(&w.ce[L*i]); ne.print();
+				nf.store(&w.cf[L*i]); nf.print();
 
 				/* update s */
 				vec nv = vec::max(vec::max(ne, nf), vd + scv);
-				nv.store(&w.cv[L*i]);
+				nv.store(&w.cv[L*i]); nv.print();
 				nv.store(&ptr[L*i]);
 
 				vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
@@ -294,12 +294,12 @@ diag_affine(
 				/* update e and f */
 				vec ne = vec::max(vh - giv, ve - gev);
 				vec nf = vec::max(vv - giv, vf - gev);
-				ne.store(&w.ce[L*i]);
-				nf.store(&w.cf[L*i]);
+				ne.store(&w.ce[L*i]); ne.print();
+				nf.store(&w.cf[L*i]); nf.print();
 
 				/* update s */
 				vec nv = vec::max(vec::max(ne, nf), vd + scv);
-				nv.store(&w.cv[L*i]);
+				nv.store(&w.cv[L*i]); nv.print();
 				nv.store(&ptr[L*i]);
 
 				vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
