@@ -13,7 +13,7 @@
 */
 #include "util.h"
 
-#define BW		( 128 )
+// #define BW		( 128 )
 #define MIN 	( 0 )
 #define OFS 	( 32768 )
 #define roundup(a, bound)		( (((a) + (bound) - 1) / (bound)) * (bound) )
