@@ -3,8 +3,8 @@
 
 import subprocess
 
-pbsim_path = '/Users/suzukihajime/docs/src/dl/pbsim-1.0.3/src/'
-ref_path = '/Users/suzukihajime/docs/oni/work/NC_000913.fna'
+pbsim_path = '/home/suzukihajime/src/pbsim-1.0.3/src/'
+ref_path = '/home/suzukihajime/oni/work/resource/NC_000913.fna'
 align_path = './a.out'
 # ./pbsim --data-type CLR --length-min 900 --length-max 1100 --accuracy-min 0.84 --accuracy-max 0.86 --model_qc ../data/model_qc_clr --length-mean 1000 --length-sd 100 --accuracy-mean 0.85 --accuracy-sd 0.01 ~/docs/oni/work/NC_000913.fna
 
