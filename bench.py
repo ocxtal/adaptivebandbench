@@ -3,8 +3,8 @@
 
 import subprocess
 
-pbsim_path = '/home/suzukihajime/src/pbsim-1.0.3/src/'
-ref_path = '/home/suzukihajime/oni/work/resource/NC_000913.fna'
+pbsim_path = '/Users/suzukihajime/docs/src/dl/pbsim-1.0.3/src/'
+ref_path = '/Users/suzukihajime/docs/lab/oni/work/NC_000913.fna'
 align_path = './a.out'
 # ./pbsim --data-type CLR --length-min 900 --length-max 1100 --accuracy-min 0.84 --accuracy-max 0.86 --model_qc ../data/model_qc_clr --length-mean 1000 --length-sd 100 --accuracy-mean 0.85 --accuracy-sd 0.01 ~/docs/oni/work/NC_000913.fna
 
@@ -40,41 +40,38 @@ def parse_maf(maf_path):
 
 			yield((ref, read))
 
-def align(align_path, algorithm, ref, read):
-	return(int(subprocess.check_output([
-		align_path, algorithm, ref, read,
-		'2', '-3', '-5', '-1', '30']).split()[0]))
+def align(align_paths, algorithms, ref, read):
+	return([[int(subprocess.check_output([
+		path, alg, ref, read, '1', '-1', '-1', '-1', '30']).split()[0])
+			for path in align_paths]
+			for alg in algorithms])
 
-def evaluate(pbsim_path, ref_path, length, error_rate):
 
-	pbsim(pbsim_path, ref_path, length, 20, error_rate)
+def evaluate(pbsim_path, ref_path, algorithm, length, error_rate):
+
+	# pbsim(pbsim_path, ref_path, length, 20, error_rate)
 	pairs = parse_maf('./sd_0001.maf')
 
 	tot = 0
-	succ = 0
-	fail = 0
+	acc = [0, 0]
+	fail = [0, 0]
 
 	for pair in pairs:
 
 		ref = pair[0] + ''.join(['A' for i in range(100)])
 		read = pair[1] + ''.join(['T' for i in range(100)])
 
-		blast_score = align('./blast', 'linear', ref, read)
-		# simdblast_score = align('./simdblast', 'linear', ref, read)
-		# rognes_score = align('./rognes', 'linear', ref, read)
-		# diag_score = align('./diag', 'linear', ref, read)
-		ddiag_score = align('./ddiag', 'linear', ref, read)
-		if blast_score == ddiag_score:
-			succ = succ + 1
-		else:
-			fail = fail + 1
+		scores = align(['./blast', './ddiag'], ['affine', 'linear'], ref, read)
+		succ = [1 if score[0] == score[1] else 0 for score in scores]
+		# print(scores, succ, acc)
+		acc = [sum(x) for x in zip(succ, acc)]
 		tot = tot + 1
 		if tot == 1000:
 			break
-		# print(blast_score, ddiag_score)
+		
 
 	# print(succ, fail)
-	return(succ, fail)
+	return(acc)
 
 if __name__ == '__main__':
 
@@ -84,7 +81,7 @@ if __name__ == '__main__':
 	arg_list = [(len, err) for len in lengths for err in error_rates]
 
 	for a in arg_list:
-		r = evaluate(pbsim_path, ref_path, a[0], a[1])
+		r = evaluate(pbsim_path, ref_path, 'affine', a[0], a[1])
 		print("{}, {}, {}, {}".format(a[0], a[1], r[0], r[1]))
 
 
