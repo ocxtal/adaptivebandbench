@@ -9,6 +9,13 @@ ref_length = 4700000
 align_path = './a.out'
 # ./pbsim --data-type CLR --length-min 900 --length-max 1100 --accuracy-min 0.84 --accuracy-max 0.86 --model_qc ../data/model_qc_clr --length-mean 1000 --length-sd 100 --accuracy-mean 0.85 --accuracy-sd 0.01 ~/docs/oni/work/NC_000913.fna
 
+def generate_params(bandwidths, xs, gs, lengths, error_rates):
+	params = [(pbsim_path, ref_path, b, 2, x, g, -2, l, e, 100)
+		for x in xs for g in gs
+		for b in bandwidths
+		for e in error_rates for l in lengths]
+	return(params)
+
 def pbsim(pbsim_path, ref_path, prefix, length, depth, accuracy):
 
 	length_sd = length * 0.05
@@ -59,7 +66,7 @@ def evaluate(pbsim_path, ref_path, bandwidth, m, x, gi, ge, length, error_rate, 
 	prefix = '{}_{}_{}_{}_{}_{}'.format(m, x, gi, ge, length, error_rate)
 	pbsim(pbsim_path, ref_path, prefix,
 		length,
-		2 * count * length / ref_length,		# depth
+		2.0 * count * length / ref_length,		# depth
 		error_rate)
 	pairs = parse_maf('./{}_0001.maf'.format(prefix))
 
@@ -78,15 +85,17 @@ def evaluate(pbsim_path, ref_path, bandwidth, m, x, gi, ge, length, error_rate, 
 			['./blast-{}'.format(bandwidth), './ddiag-{}'.format(bandwidth)],
 			['linear', 'affine'], ref, read, m, x, gi, ge)
 		succ = [1 if score[0] == score[1] else 0 for score in scores]
-		# print(scores, succ, acc)
-		acc = [sum(x) for x in zip(succ, acc)]
+
+		acc = [sum(i) for i in zip(succ, acc)]
 		tot = tot + 1
+
+		# print(scores, succ, acc)
 		if tot == count:
 			break
 	
 	cleanup_pbsim(prefix)
 
-	print(bandwidth, m, x, gi, ge, length, error_rate, acc)
+	# print(bandwidth, m, x, gi, ge, length, error_rate, acc)
 	return(acc)
 
 def apply(argv): return(argv[0](*argv[1:]))
