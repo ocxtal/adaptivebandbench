@@ -1,5 +1,11 @@
 .DS_Store
 *.s
+*.eps
+*.csv
+*.fastq
+*.maf
+*.ref
+*.pyc
 *.dSYM/
 *.dwarf
 a.out

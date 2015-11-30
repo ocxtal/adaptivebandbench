@@ -8,7 +8,7 @@
 #include <string.h>
 #include "util.h"
 
-#define MIN			( -32768 + 10 )
+#define MIN			( -32768 + 30 )
 
 /**
  * @fn blast_linear

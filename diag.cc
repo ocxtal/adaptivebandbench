@@ -289,6 +289,7 @@ diag_affine(
 				vec ve; ve.load(&w.ce[L*i]);
 				vec tf; tf.load(&w.cf[L*i]);
 				vec vf = (tf<<1) | (cf>>7);
+				cf = tf;
 
 				/* update e and f */
 				vec ne = vec::max(vh - giv, ve - gev);

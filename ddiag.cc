@@ -85,6 +85,10 @@ ddiag_linear(
 	for(uint64_t p = 0; p < (uint64_t)(alen+blen-1); p++) {
 		debug("%lld, %d, %d", dir, w.cv[BW-1], w.cv[0]);
 		dir = dir_trans[w.cv[BW-1] > w.cv[0]][dir];
+
+		// dump(w.pv, sizeof(uint16_t) * BW);
+		// dump(w.cv, sizeof(uint16_t) * BW);
+
 		switch(dir & 0x03) {
 			case DD: {
 				debug("DD");
@@ -304,6 +308,12 @@ ddiag_affine(
 	for(uint64_t p = 0; p < (uint64_t)(alen+blen-1); p++) {
 		debug("%lld, %d, %d", dir, w.cv[BW-1], w.cv[0]);
 		dir = dir_trans[w.cv[BW-1] > w.cv[0]][dir];
+
+		// dump(w.pv, sizeof(uint16_t) * BW);
+		// dump(w.cv, sizeof(uint16_t) * BW);
+		// dump(w.ce, sizeof(uint16_t) * BW);
+		// dump(w.cf, sizeof(uint16_t) * BW);
+
 		switch(dir & 0x03) {
 			case DD: {
 				debug("DD");
@@ -430,6 +440,7 @@ ddiag_affine(
 					vec ve; ve.load(&w.ce[L*i]);
 					vec tf; tf.load(&w.cf[L*i]);
 					vec vf = (tf<<1) | (cf>>7);
+					cf = tf;
 
 					/* update e and f */
 					vec ne = vec::max(vh - giv, ve - gev);
@@ -479,6 +490,7 @@ ddiag_affine(
 					vec ve; ve.load(&w.ce[L*i]);
 					vec tf; tf.load(&w.cf[L*i]);
 					vec vf = (tf<<1) | (cf>>7);
+					cf = tf;
 
 					/* update e and f */
 					vec ne = vec::max(vh - giv, ve - gev);
