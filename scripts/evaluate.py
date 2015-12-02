@@ -13,6 +13,7 @@ if __name__ == '__main__':
 	import sys
 	# pbsim_path = '/Users/suzukihajime/docs/src/dl/pbsim-1.0.3/src/'
 	# ref_path = '/Users/suzukihajime/docs/lab/oni/work/NC_000913.fna'
+	# bin_path = '..'
 
 	lines = []
 	with open(sys.argv[1], "r") as r: lines = r.readlines()
@@ -20,5 +21,6 @@ if __name__ == '__main__':
 	with open(sys.argv[2], "w") as w:
 		for line in lines:
 			p = [num(s) for s in line.split()]
-			res = evaluate(pbsim_path, ref_path, *p)
+			print(p)
+			res = evaluate(pbsim_path, ref_path, bin_path, *p)
 			w.write('{}\n'.format('\t'.join([str(r) for r in p+res])))

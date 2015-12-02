@@ -2,18 +2,17 @@
 # encoding: utf-8
 
 import subprocess
+from params import *
 
-pbsim_path = '/home/suzukihajime/src/pbsim-1.0.3/src/'
-ref_path = '/home/suzukihajime/oni/work/resource/NC_000913.fna'
-ref_length = 4700000
-align_path = './a.out'
-# ./pbsim --data-type CLR --length-min 900 --length-max 1100 --accuracy-min 0.84 --accuracy-max 0.86 --model_qc ../data/model_qc_clr --length-mean 1000 --length-sd 100 --accuracy-mean 0.85 --accuracy-sd 0.01 ~/docs/oni/work/NC_000913.fna
+def generate_params(xs, gs, bandwidths, error_rates, lengths, count):
+	from itertools import product
+	params = [[pbsim_path, ref_path] + list(p) + [count]
+		for p in list(product(*params_list))]
 
-def generate_params(bandwidths, xs, gs, lengths, error_rates):
-	params = [(pbsim_path, ref_path, b, 2, x, g, -2, l, e, 100)
-		for x in xs for g in gs
-		for b in bandwidths
-		for e in error_rates for l in lengths]
+#	params = [(pbsim_path, ref_path, x, g, b, e, l, count)
+#		for x in xs for g in gs
+#		for b in bandwidths
+#		for e in error_rates for l in lengths]
 	return(params)
 
 def pbsim(pbsim_path, ref_path, prefix, length, depth, accuracy):
@@ -24,24 +23,24 @@ def pbsim(pbsim_path, ref_path, prefix, length, depth, accuracy):
 	ret = subprocess.call([
 		'/'.join([pbsim_path, 'pbsim']),
 		ref_path,
-		'--prefix={}'.format(prefix),
+		'--prefix={0}'.format(prefix),
 		'--data-type=CLR',
-		'--depth={}'.format(depth),
-		'--length-mean={}'.format(length),
-		'--length-min={}'.format(length - length_sd),
-		'--length-max={}'.format(length + length_sd),
-		'--length-sd={}'.format(length_sd),
-		'--accuracy-mean={}'.format(accuracy),
-		'--accuracy-min={}'.format(accuracy - accuracy_sd),
-		'--accuracy-max={}'.format(accuracy + accuracy_sd),
-		'--accuracy-sd={}'.format(accuracy_sd),
-		'--model_qc={}'.format('/'.join([pbsim_path, '../data/model_qc_clr']))])
+		'--depth={0}'.format(depth),
+		'--length-mean={0}'.format(length),
+		'--length-min={0}'.format(length - length_sd),
+		'--length-max={0}'.format(length + length_sd),
+		'--length-sd={0}'.format(length_sd),
+		'--accuracy-mean={0}'.format(accuracy),
+		'--accuracy-min={0}'.format(accuracy - accuracy_sd),
+		'--accuracy-max={0}'.format(accuracy + accuracy_sd),
+		'--accuracy-sd={0}'.format(accuracy_sd),
+		'--model_qc={0}'.format('/'.join([pbsim_path, '../data/model_qc_clr']))])
 	return(ret)
 
 def cleanup_pbsim(prefix):
-	subprocess.call(['rm', './{}_0001.fastq'.format(prefix)])
-	subprocess.call(['rm', './{}_0001.maf'.format(prefix)])
-	subprocess.call(['rm', './{}_0001.ref'.format(prefix)])
+	subprocess.call(['rm', './{0}_0001.fastq'.format(prefix)])
+	subprocess.call(['rm', './{0}_0001.maf'.format(prefix)])
+	subprocess.call(['rm', './{0}_0001.ref'.format(prefix)])
 
 def parse_maf(maf_path):
 	with open(maf_path) as f:
@@ -61,14 +60,14 @@ def align(align_paths, algorithms, ref, read, m, x, gi, ge):
 			for alg in algorithms])
 
 
-def evaluate(pbsim_path, ref_path, bandwidth, m, x, gi, ge, length, error_rate, count):
+def evaluate(pbsim_path, ref_path, bin_path, x, gi, bandwidth, error_rate, length, count):
 
-	prefix = '{}_{}_{}_{}_{}_{}'.format(m, x, gi, ge, length, error_rate)
+	prefix = '{0}_{1}_{2}_{3}_{4}'.format(-x, -gi, bandwidth, error_rate, length)
 	pbsim(pbsim_path, ref_path, prefix,
 		length,
 		2.0 * count * length / ref_length,		# depth
 		error_rate)
-	pairs = parse_maf('./{}_0001.maf'.format(prefix))
+	pairs = parse_maf('./{0}_0001.maf'.format(prefix))
 
 	tot = 0
 	acc = [0, 0]
@@ -82,8 +81,8 @@ def evaluate(pbsim_path, ref_path, bandwidth, m, x, gi, ge, length, error_rate, 
 		# print(ref, read)
 
 		scores = align(
-			['./blast-{}'.format(bandwidth), './ddiag-{}'.format(bandwidth)],
-			['linear', 'affine'], ref, read, m, x, gi, ge)
+			['{0}/blast-{1}'.format(bin_path, bandwidth), '{0}/ddiag-{1}'.format(bin_path, bandwidth)],
+			['linear', 'affine'], ref, read, 2, x, gi, -2)
 		succ = [1 if score[0] == score[1] else 0 for score in scores]
 
 		acc = [sum(i) for i in zip(succ, acc)]
@@ -95,21 +94,35 @@ def evaluate(pbsim_path, ref_path, bandwidth, m, x, gi, ge, length, error_rate, 
 	
 	cleanup_pbsim(prefix)
 
-	# print(bandwidth, m, x, gi, ge, length, error_rate, acc)
+	# print(bandwidth, m, x, gi, ge, error_rate, length, acc)
 	return(acc)
+
+
+def load_results(filename):
+	
+	from numpy import array
+
+	linear = []
+	affine = []
+	with open(filename) as f:
+		linear = eval(f.readline())
+		affine = eval(f.readline())
+
+	return(array(linear), array(affine))
+
 
 def apply(argv): return(argv[0](*argv[1:]))
 
 if __name__ == '__main__':
 
-	lengths = [100, 300, 1000, 3000, 10000]
-	error_rates = [0.65, 0.75, 0.85, 0.95]
-	bandwidths = [16, 32, 48, 64]
-	xs = [-i for i in range(2, 7)]		# -1..-3
-	gs = [-i for i in range(2, 11)]		# -1..-5
+	# lengths = [100, 300, 1000, 3000, 10000]
+	# error_rates = [0.65, 0.75, 0.85, 0.95]
+	# bandwidths = [16, 32, 48, 64]
+	# xs = [-i for i in range(2, 7)]		# -1..-3
+	# gs = [-i for i in range(2, 11)]		# -1..-5
 
 	from multiprocessing import Pool
-	func_args = [(evaluate, pbsim_path, ref_path, b, 2, x, g, -2, l, e, 100)
+	func_args = [(evaluate, pbsim_path, ref_path, '.', 2, x, g, -2, b, e, l, 100)
 		for x in xs for g in gs
 		for b in bandwidths
 		for e in error_rates for l in lengths]
@@ -130,8 +143,7 @@ if __name__ == '__main__':
 		else:
 			for d in flat: yield d
 
-	results = nest(results,
-		[len(xs), len(gs), len(bandwidths), len(error_rates), len(lengths)])
+	results = nest(results, dimensions)
 
 	# print(results)
 
@@ -139,18 +151,18 @@ if __name__ == '__main__':
 	res_arr = array(results)
 
 	res_linear = res_arr[
-		0:len(xs),
-		0:len(gs),
-		0:len(bandwidths),
-		0:len(error_rates),
-		0:len(lengths),
+		0:dimensions[0], # xs
+		0:dimensions[1], # gs
+		0:dimensions[2], # bandwidths
+		0:dimensions[3], # error_rates
+		0:dimensions[4], # lengths
 		0]
 	res_affine = res_arr[
-		0:len(xs),
-		0:len(gs),
-		0:len(bandwidths),
-		0:len(error_rates),
-		0:len(lengths),
+		0:dimensions[0], # xs
+		0:dimensions[1], # gs
+		0:dimensions[2], # bandwidths
+		0:dimensions[3], # error_rates
+		0:dimensions[4], # lengths
 		1]
 
 	print(res_linear.tolist())
