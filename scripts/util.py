@@ -48,9 +48,10 @@ def parse_maf(maf_path):
 
 			yield((ref, read))
 
-def align(align_paths, algorithms, ref, read, m, x, gi, ge):
+def align(align_paths, algorithms, ref, read, m, x, gi, ge, xdrop_coef):
 	return([[int(subprocess.check_output([
-		path, alg, ref, read, str(m), str(x), str(gi), str(ge), str(20 * -x)]).split()[0])
+		path, alg, ref, read, str(m), str(x), str(gi), str(ge),
+		str((20 + xdrop_coef) * -gi)]).split()[0])
 			for path in align_paths]
 			for alg in algorithms])
 
@@ -94,7 +95,8 @@ def evaluate_impl(pbsim_path, ref_path, bin_path,
 		scores = align(
 			['{0}/blast-{1}'.format(bin_path, bandwidth), '{0}/ddiag-{1}'.format(bin_path, bandwidth)],
 			['linear', 'affine'], ref, read,
-			2, x, gi, -2)		# m, x, gi, ge
+			2, x, gi, -2,		# m, x, gi, ge
+			max(param1, param2))
 		succ = [1 if score[0] == score[1] else 0 for score in scores]
 
 		acc = [sum(i) for i in zip(succ, acc)]
