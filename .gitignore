@@ -4,7 +4,12 @@
 *.dwarf
 a.out
 *.o
+*.pyc
 *sublime*
 *.txt
+*.csv
+*.tsv
 .gdb_history
 stuff/
+bin/
+work/

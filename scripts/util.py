@@ -2,19 +2,14 @@
 # encoding: utf-8
 
 import subprocess
+import random
 from params import *
 
-def generate_params(xs, gs, bandwidths, error_rates, lengths, count):
-	from itertools import product
-	params = [[pbsim_path, ref_path] + list(p) + [count]
-		for p in list(product(*params_list))]
 
-#	params = [(pbsim_path, ref_path, x, g, b, e, l, count)
-#		for x in xs for g in gs
-#		for b in bandwidths
-#		for e in error_rates for l in lengths]
-	return(params)
+# initalize rand seed
+random.seed(None)
 
+# pbsim
 def pbsim(pbsim_path, ref_path, prefix, length, depth, accuracy):
 
 	length_sd = length * 0.05
@@ -59,13 +54,29 @@ def align(align_paths, algorithms, ref, read, m, x, gi, ge):
 			for path in align_paths]
 			for alg in algorithms])
 
+# parameter generation
+def generate_params(params_list, count):
+	from itertools import product
+	params = [[pbsim_path, ref_path] + list(p) + [count]
+		for p in list(product(*params_list))]
+	return(params)
 
-def evaluate(pbsim_path, ref_path, bin_path, x, gi, bandwidth, error_rate, length, count):
 
-	prefix = '{0}_{1}_{2}_{3}_{4}'.format(-x, -gi, bandwidth, error_rate, length)
+def randbase():
+	return(['A', 'C', 'G', 'T'][random.randint(0, 3)])
+
+def default_modifier(seq, param):
+	return(seq + ''.join([randbase() for i in range(100)]))
+
+
+def evaluate_impl(pbsim_path, ref_path, bin_path,
+	gi, x, bandwidth, error_rate, length, count,
+	modifier, param1, param2):
+
+	prefix = 's_{0}_{1}_{2}_{3}_{4}'.format(param1, param2, bandwidth, error_rate, length)
 	pbsim(pbsim_path, ref_path, prefix,
 		length,
-		2.0 * count * length / ref_length,		# depth
+		1.2 * count * length / ref_length,		# depth
 		error_rate)
 	pairs = parse_maf('./{0}_0001.maf'.format(prefix))
 
@@ -75,14 +86,15 @@ def evaluate(pbsim_path, ref_path, bin_path, x, gi, bandwidth, error_rate, lengt
 
 	for pair in pairs:
 
-		ref = pair[0] + ''.join(['A' for i in range(100)])
-		read = pair[1] + ''.join(['T' for i in range(100)])
+		ref = modifier(pair[0], param1)
+		read = modifier(pair[1], param2)
 
 		# print(ref, read)
 
 		scores = align(
 			['{0}/blast-{1}'.format(bin_path, bandwidth), '{0}/ddiag-{1}'.format(bin_path, bandwidth)],
-			['linear', 'affine'], ref, read, 2, x, gi, -2)
+			['linear', 'affine'], ref, read,
+			2, x, gi, -2)		# m, x, gi, ge
 		succ = [1 if score[0] == score[1] else 0 for score in scores]
 
 		acc = [sum(i) for i in zip(succ, acc)]
@@ -98,6 +110,13 @@ def evaluate(pbsim_path, ref_path, bin_path, x, gi, bandwidth, error_rate, lengt
 	return(acc)
 
 
+def evaluate(pbsim_path, ref_path, bin_path, gi, x, bandwidth, error_rate, length, count):
+	return(evaluate_impl(pbsim_path, ref_path, bin_path,
+		gi, x, bandwidth, error_rate, length, count,
+		default_modifier, 0, 0))
+
+
+
 def load_results(filename):
 	
 	from numpy import array
@@ -110,7 +129,7 @@ def load_results(filename):
 
 	return(array(linear), array(affine))
 
-
+"""
 def apply(argv): return(argv[0](*argv[1:]))
 
 if __name__ == '__main__':
@@ -167,5 +186,5 @@ if __name__ == '__main__':
 
 	print(res_linear.tolist())
 	print(res_affine.tolist())
-
+"""
 
