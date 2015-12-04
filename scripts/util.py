@@ -74,7 +74,8 @@ def evaluate_impl(pbsim_path, ref_path, bin_path,
 	gi, x, bandwidth, error_rate, length, count,
 	modifier, param1, param2):
 
-	prefix = 's_{0}_{1}_{2}_{3}_{4}'.format(param1, param2, bandwidth, error_rate, length)
+	prefix = 's_{0}_{1}_{2}_{3}_{4}_{5}_{6}'.format(
+		-x, -gi, bandwidth, error_rate, length, param1, param2)
 	pbsim(pbsim_path, ref_path, prefix,
 		length,
 		1.2 * count * length / ref_length,		# depth
@@ -115,7 +116,7 @@ def evaluate_impl(pbsim_path, ref_path, bin_path,
 def evaluate(pbsim_path, ref_path, bin_path, gi, x, bandwidth, error_rate, length, count):
 	return(evaluate_impl(pbsim_path, ref_path, bin_path,
 		gi, x, bandwidth, error_rate, length, count,
-		default_modifier, 0, 0))
+		default_modifier, 0, 1))
 
 
 

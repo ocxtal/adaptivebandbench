@@ -8,7 +8,7 @@ def randbase():
 
 def gap_insert_modifier(seq, param):
 	length = len(seq)
-	insert_pos = random.randint(int(0.1 * length), int(0.9 * length))
+	insert_pos = random.randint(int(0.1 * length), int(0.6 * length))
 	insert_seq = ''.join([randbase() for i in range(param)])
 	tail_seq = ''.join([randbase() for i in range(100)])
 	# print(seq, insert_pos, insert_seq, tail_seq, length, param)
