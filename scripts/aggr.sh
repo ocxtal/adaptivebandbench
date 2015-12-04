@@ -7,4 +7,4 @@ SCRIPT_DIR=`dirname $0`
 
 cat $WORK_DIR/out.tsv.* > $WORK_DIR/out.tsv
 python $SCRIPT_DIR/aggregate.py $WORK_DIR/out.tsv $WORK_DIR/result.txt
-rm params.tsv.* evaluate.o* evaluate.e* out.tsv.* *.maf *.fastq *.ref
+rm params.tsv.* evaluate.o* evaluate.e* out.tsv.*
