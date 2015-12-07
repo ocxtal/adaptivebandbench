@@ -51,7 +51,7 @@ def parse_maf(maf_path):
 def align(align_paths, algorithms, ref, read, m, x, gi, ge, xdrop_coef):
 	return([[int(subprocess.check_output([
 		path, alg, ref, read, str(m), str(x), str(gi), str(ge),
-		str((20 + xdrop_coef) * -gi)]).split()[0])
+		str((60 + xdrop_coef) * -gi)]).split()[0])
 			for path in align_paths]
 			for alg in algorithms])
 
