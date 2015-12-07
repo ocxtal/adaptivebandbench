@@ -25,7 +25,7 @@ ddiag_linear(
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
-	int8_t m, int8_t x, int8_t gi, int8_t ge)
+	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
 {
 	uint16_t *mat = (uint16_t *)aligned_malloc(
 		(alen+blen-1) * BW * sizeof(uint16_t),
@@ -40,8 +40,8 @@ ddiag_linear(
 		uint16_t pad2[8];
 		uint16_t cv[BW];
 		uint16_t pad3[8];
+		uint16_t max[BW];
 	} w __attribute__(( aligned(16) ));
-	uint16_t maxv[BW] __attribute__(( aligned(16) ));
 
 	/* init char vec */
 	for(uint64_t i = 0; i < (uint64_t)BW/2; i++) {
@@ -69,7 +69,7 @@ ddiag_linear(
 
 	/* init maxv */
 	for(uint64_t i = 0; i < (uint64_t)BW; i++) {
-		maxv[i] = 0;
+		w.max[i] = w.cv[i];
 	}
 
 	/* direction determiner */
@@ -122,8 +122,8 @@ ddiag_linear(
 					nv.store(&w.cv[L*i]);
 					nv.store(&ptr[L*i]);
 
-					vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
-					t.store(&maxv[L*i]);
+					vec t; t.load(&w.max[L*i]); t = vec::max(t, nv);
+					t.store(&w.max[L*i]);
 				}
 			} break;
 			case RD: {
@@ -151,8 +151,8 @@ ddiag_linear(
 					nv.store(&w.cv[L*i]);
 					nv.store(&ptr[L*i]);
 
-					vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
-					t.store(&maxv[L*i]);
+					vec t; t.load(&w.max[L*i]); t = vec::max(t, nv);
+					t.store(&w.max[L*i]);
 				}
 			} break;
 			case DR: {
@@ -180,8 +180,8 @@ ddiag_linear(
 					nv.store(&w.cv[L*i]);
 					nv.store(&ptr[L*i]);
 
-					vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
-					t.store(&maxv[L*i]);
+					vec t; t.load(&w.max[L*i]); t = vec::max(t, nv);
+					t.store(&w.max[L*i]);
 				}
 			} break;
 			case RR: {
@@ -216,18 +216,20 @@ ddiag_linear(
 					nv.store(&w.cv[L*i]);
 					nv.store(&ptr[L*i]);
 
-					vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
-					t.store(&maxv[L*i]);
+					vec t; t.load(&w.max[L*i]); t = vec::max(t, nv);
+					t.store(&w.max[L*i]);
 				}
 			} break;
 		}
 		ptr += BW;
+
+		if(w.cv[BW/2] < w.max[BW/2] - xt) { break; }
 	}
 	free(mat);
 
 	int32_t max = 0;
 	for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
-		vec t; t.load(&maxv[L*i]);
+		vec t; t.load(&w.max[L*i]);
 		debug("%d", t.hmax());
 		if(t.hmax() > max) { max = t.hmax(); }
 	}
@@ -243,7 +245,7 @@ ddiag_affine(
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
-	int8_t m, int8_t x, int8_t gi, int8_t ge)
+	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
 {
 	uint16_t *mat = (uint16_t *)aligned_malloc(
 		(alen+blen-1) * 3 * BW * sizeof(uint16_t),
@@ -261,8 +263,8 @@ ddiag_affine(
 		uint16_t ce[BW];
 		uint16_t pad4[8];
 		uint16_t cf[BW];
+		uint16_t max[BW];
 	} w __attribute__(( aligned(16) ));
-	uint16_t maxv[BW] __attribute__(( aligned(16) ));
 
 	/* init char vec */
 	for(uint64_t i = 0; i < (uint64_t)BW/2; i++) {
@@ -293,7 +295,7 @@ ddiag_affine(
 
 	/* init maxv */
 	for(uint64_t i = 0; i < (uint64_t)BW; i++) {
-		maxv[i] = 0;
+		w.max[i] = w.cv[i];
 	}
 
 	/* direction determiner */
@@ -361,8 +363,8 @@ ddiag_affine(
 					nv.store(&w.cv[L*i]); nv.print();
 					nv.store(&ptr[L*i]);
 
-					vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
-					t.store(&maxv[L*i]);
+					vec t; t.load(&w.max[L*i]); t = vec::max(t, nv);
+					t.store(&w.max[L*i]);
 				}
 			} break;
 			case RD: {
@@ -407,8 +409,8 @@ ddiag_affine(
 					nv.store(&w.cv[L*i]); nv.print();
 					nv.store(&ptr[L*i]);
 
-					vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
-					t.store(&maxv[L*i]);
+					vec t; t.load(&w.max[L*i]); t = vec::max(t, nv);
+					t.store(&w.max[L*i]);
 				}
 			} break;
 			case DR: {
@@ -453,8 +455,8 @@ ddiag_affine(
 					nv.store(&w.cv[L*i]); nv.print();
 					nv.store(&ptr[L*i]);
 
-					vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
-					t.store(&maxv[L*i]);
+					vec t; t.load(&w.max[L*i]); t = vec::max(t, nv);
+					t.store(&w.max[L*i]);
 				}
 			} break;
 			case RR: {
@@ -503,17 +505,20 @@ ddiag_affine(
 					nv.store(&w.cv[L*i]); nv.print();
 					nv.store(&ptr[L*i]);
 
-					vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
-					t.store(&maxv[L*i]);
+					vec t; t.load(&w.max[L*i]); t = vec::max(t, nv);
+					t.store(&w.max[L*i]);
 				}
 			} break;
 		}
+		ptr += BW;
+
+		if(w.cv[BW/2] < w.max[BW/2] - xt) { break; }
 	}
 	free(mat);
 
 	int32_t max = 0;
 	for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
-		vec t; t.load(&maxv[L*i]);
+		vec t; t.load(&w.max[L*i]);
 		debug("%d", t.hmax());
 		if(t.hmax() > max) { max = t.hmax(); }
 	}
@@ -531,7 +536,8 @@ int main_ext(int argc, char *argv[])
 			atoi(argv[4]),
 			atoi(argv[5]),
 			atoi(argv[6]),
-			atoi(argv[7]));
+			atoi(argv[7]),
+			atoi(argv[8]));
 		printf("%d\n", score);
 	} else if(strcmp(argv[1], "affine") == 0) {
 		int score = ddiag_affine(
@@ -540,7 +546,8 @@ int main_ext(int argc, char *argv[])
 			atoi(argv[4]),
 			atoi(argv[5]),
 			atoi(argv[6]),
-			atoi(argv[7]));
+			atoi(argv[7]),
+			atoi(argv[8]));
 		printf("%d\n", score);
 	} else {
 		printf("./a.out linear AAA AAA 2 -3 -5 -1 30\n");
@@ -557,10 +564,10 @@ int main(int argc, char *argv[])
 
 	if(argc > 1) { return(main_ext(argc, argv)); }
 
-	int sl = ddiag_linear(a, strlen(a), b, strlen(b), 2, -3, -5, -1);
+	int sl = ddiag_linear(a, strlen(a), b, strlen(b), 2, -3, -5, -1, 30);
 	printf("%d\n", sl);
 
-	int sa = ddiag_affine(a, strlen(a), b, strlen(b), 2, -3, -5, -1);
+	int sa = ddiag_affine(a, strlen(a), b, strlen(b), 2, -3, -5, -1, 30);
 	printf("%d\n", sa);
 
 	return(0);
