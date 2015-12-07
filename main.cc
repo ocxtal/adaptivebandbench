@@ -16,13 +16,13 @@ int rognes_linear(
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
-	int8_t m, int8_t x, int8_t gi, int8_t ge);
+	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
 int rognes_affine(
 	char const *a,
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
-	int8_t m, int8_t x, int8_t gi, int8_t ge);
+	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
 
 int blast_linear(
 	char const *a,
@@ -55,26 +55,26 @@ int diag_linear(
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
-	int8_t m, int8_t x, int8_t gi, int8_t ge);
+	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
 int diag_affine(
 	char const *a,
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
-	int8_t m, int8_t x, int8_t gi, int8_t ge);
+	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
 
 int ddiag_linear(
 	char const *a,
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
-	int8_t m, int8_t x, int8_t gi, int8_t ge);
+	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
 int ddiag_affine(
 	char const *a,
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
-	int8_t m, int8_t x, int8_t gi, int8_t ge);
+	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
 
 
 /**
@@ -158,12 +158,12 @@ int main(int argc, char *argv[])
 	bench_init(ra);
 	bench_start(rl);
 	for(i = 0; i < cnt; i++) {
-		rognes_linear(a, strlen(a), b, strlen(b), m, x, gi, ge);
+		rognes_linear(a, strlen(a), b, strlen(b), m, x, gi, ge, 100);
 	}
 	bench_end(rl);
 	bench_start(ra);
 	for(i = 0; i < cnt; i++) {
-		rognes_affine(a, strlen(a), b, strlen(b), m, x, gi, ge);
+		rognes_affine(a, strlen(a), b, strlen(b), m, x, gi, ge, 100);
 	}
 	bench_end(ra);
 	printf("rognes:\t%lld\t%lld\n",
@@ -209,12 +209,12 @@ int main(int argc, char *argv[])
 	bench_init(da);
 	bench_start(dl);
 	for(i = 0; i < cnt; i++) {
-		diag_linear(a, strlen(a), b, strlen(b), m, x, gi, ge);
+		diag_linear(a, strlen(a), b, strlen(b), m, x, gi, ge, 100);
 	}
 	bench_end(dl);
 	bench_start(da);
 	for(i = 0; i < cnt; i++) {
-		diag_affine(a, strlen(a), b, strlen(b), m, x, gi, ge);
+		diag_affine(a, strlen(a), b, strlen(b), m, x, gi, ge, 100);
 	}
 	bench_end(da);
 	printf("diag:\t%lld\t%lld\n",
@@ -226,12 +226,12 @@ int main(int argc, char *argv[])
 	bench_init(da);
 	bench_start(dl);
 	for(i = 0; i < cnt; i++) {
-		ddiag_linear(a, strlen(a), b, strlen(b), m, x, gi, ge);
+		ddiag_linear(a, strlen(a), b, strlen(b), m, x, gi, ge, 100);
 	}
 	bench_end(dl);
 	bench_start(da);
 	for(i = 0; i < cnt; i++) {
-		ddiag_affine(a, strlen(a), b, strlen(b), m, x, gi, ge);
+		ddiag_affine(a, strlen(a), b, strlen(b), m, x, gi, ge, 100);
 	}
 	bench_end(da);
 	printf("ddiag:\t%lld\t%lld\n",
