@@ -8,7 +8,7 @@ def num(s):
 	try: return int(s)
 	except ValueError: return float(s)
 
-def parse_and_run(input_file, output_file, evaluate_function):	
+def parse_and_run(input_file, output_file, evaluate_function):
 
 	lines = []
 	with open(input_file, "r") as r: lines = r.readlines()
@@ -16,7 +16,7 @@ def parse_and_run(input_file, output_file, evaluate_function):
 	with open(output_file, "w") as w:
 		for line in lines:
 			p = [num(s) for s in line.split()]
-			print(p)
+			# print(p)
 			res = evaluate_function(pbsim_path, ref_path, bin_path, *p)
 			w.write('{}\n'.format('\t'.join([str(r) for r in p+res])))
 

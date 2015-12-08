@@ -69,6 +69,14 @@ def randbase():
 def default_modifier(seq, param):
 	return(seq + ''.join([randbase() for i in range(100)]))
 
+# util
+def clip(x, min, max):
+	if x < min:
+		return min
+	elif x > max:
+		return max
+	else:
+		return x
 
 def evaluate_impl(pbsim_path, ref_path, bin_path,
 	gi, x, bandwidth, error_rate, length, count,
@@ -83,8 +91,11 @@ def evaluate_impl(pbsim_path, ref_path, bin_path,
 	pairs = parse_maf('./{0}_0001.maf'.format(prefix))
 
 	tot = 0
-	acc = [0, 0]
+	hist = [[0 for i in range(hist_size)], [0 for j in range(hist_size)]]
+	# acc = [0, 0]
 	# fail = [0, 0]
+
+	print(hist)
 
 	for pair in pairs:
 
@@ -98,9 +109,11 @@ def evaluate_impl(pbsim_path, ref_path, bin_path,
 			['linear', 'affine'], ref, read,
 			2, x, gi, -2,		# m, x, gi, ge
 			max(param1, param2))
-		succ = [1 if score[0] == score[1] else 0 for score in scores]
-
-		acc = [sum(i) for i in zip(succ, acc)]
+		
+		indices = [clip(score[1] - score[0] + hist_size/2, 0, hist_size-1) for score in scores]
+		# print(indices, scores)
+		for (i, index) in zip(range(len(indices)), indices):
+			hist[i][index] = hist[i][index] + 1
 		tot = tot + 1
 
 		# print(scores, succ, acc)
@@ -109,8 +122,9 @@ def evaluate_impl(pbsim_path, ref_path, bin_path,
 	
 	cleanup_pbsim(prefix)
 
+	print(hist)
 	# print(bandwidth, m, x, gi, ge, error_rate, length, acc)
-	return(acc)
+	return(hist)
 
 
 def evaluate(pbsim_path, ref_path, bin_path, gi, x, bandwidth, error_rate, length, count):
@@ -119,8 +133,70 @@ def evaluate(pbsim_path, ref_path, bin_path, gi, x, bandwidth, error_rate, lengt
 		default_modifier, 0, 1))
 
 
+# utility
+def num(s):
+	try: return int(s)
+	except ValueError: return float(s)
 
-def load_results(filename):
+
+def array(size):
+	if len(size) == 1:
+		return([0 for i in range(size[0])])
+	else:
+		return([array(size[1:]) for i in range(size[0])])
+def set_array(arr, indices, val):
+	if len(indices) == 1:
+		arr[indices[0]] = val
+	else:
+		set_array(arr[indices[0]], indices[1:], val)
+def get_array(arr, indices):
+	if len(indices) == 1:
+		return(arr[indices[0]])
+	else:
+		return(get_array(arr[indices[0]], indices[1:]))
+
+def default_aggregator(hist):
+
+	return(hist[hist_size/2])
+
+
+def hist_sum_aggregator(hist):
+
+	return(sum(hist[hist_size/2:hist_size/2 + 10]))
+
+
+def aggregate_impl(input_file, output_file, params_list, aggregator):
+
+	dimensions = [len(p) for p in params_list]
+	results_linear = array(dimensions)
+	results_affine = array(dimensions)
+
+	import sys
+
+	lines = []
+	with open(input_file) as r: lines = r.readlines()
+
+	for line in lines:
+		p = [eval(s) for s in line.split('\t')]
+		# print(p)
+		indices = [l.index(q) for (l, q) in zip(params_list, p)]
+		# print(indices)
+
+		r = p[len(params_list) + 1:]
+
+		set_array(results_linear, indices, aggregator(r[0]))
+		set_array(results_affine, indices, aggregator(r[1]))
+
+	with open(output_file, "w") as w:
+		w.write(str(results_linear) + '\n')
+		w.write(str(results_affine) + '\n')
+
+def aggregate(input_file, output_file, params_list):
+
+	aggregate_impl(input_file, output_file, params_list, default_aggregator)
+
+
+def load_result_impl(filename):
 	
 	from numpy import array
 
