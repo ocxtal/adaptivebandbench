@@ -1,14 +1,14 @@
 
 ## ファイル
 
-scripts/ : ベンチマーク用スクリプト
-docs/ : outline.txtが入っている
+* scripts/ : ベンチマーク用スクリプト
+* docs/ : outline.txtが入っている
 
-blast.cc : blast_SemiGappedAlign
-simdblast.cc : blast_SIMDSemiGappedAlign
-rognes.cc : static banded with horizontal packed band
-diag.cc : static banded with anti-diagonal packed band
-ddiag.cc : dynamic banded with anti-diagonal packed band
+* blast.cc : blast_SemiGappedAlign
+* simdblast.cc : blast_SIMDSemiGappedAlign
+* rognes.cc : static banded with horizontal packed band
+* diag.cc : static banded with anti-diagonal packed band
+* ddiag.cc : dynamic banded with anti-diagonal packed band
 
 ## コンパイル
 
