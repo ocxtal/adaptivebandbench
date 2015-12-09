@@ -23,7 +23,7 @@ rognes_linear(
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
-	int8_t m, int8_t x, int8_t gi, int8_t ge)
+	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
 {
 	uint16_t *mat = (uint16_t *)aligned_malloc(
 		alen * 2 * BW * sizeof(uint16_t),
@@ -35,8 +35,8 @@ rognes_linear(
 		uint16_t pad1[8];
 		uint16_t pv[2*BW];
 		uint16_t pad2[8];
+		uint16_t max[2*BW];
 	} w __attribute__(( aligned(16) ));
-	uint16_t maxv[2*BW] __attribute__(( aligned(16) ));
 
 	/* init char vec */
 	for(uint64_t i = 0; i < (uint64_t)BW; i++) { w.b[i] = 0; }
@@ -53,7 +53,7 @@ rognes_linear(
 
 	/* init maxv */
 	for(uint64_t i = 0; i < 2*BW; i++) {
-		maxv[i] = 0;
+		w.max[i] = w.pv[i];
 	}
 
 	vec mv(m), xv(x), giv(-gi);
@@ -102,16 +102,18 @@ rognes_linear(
 			nv.store(&w.pv[L*i]); nv.print();
 			nv.store(&ptr[L*i]);
 
-			vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
-			t.store(&maxv[L*i]);
+			vec t; t.load(&w.max[L*i]); t = vec::max(t, nv);
+			t.store(&w.max[L*i]);
 		}
 		ptr += 2*BW;
+
+		if(w.pv[BW] < w.max[BW] - xt) { break; }
 	}
 	free(mat);
 
 	int32_t max = 0;
 	for(uint64_t i = 0; i < (uint64_t)(2*BW / L); i++) {
-		vec t; t.load(&maxv[L*i]);
+		vec t; t.load(&w.max[L*i]);
 		debug("%d", t.hmax());
 		if(t.hmax() > max) { max = t.hmax(); }
 	}
@@ -127,7 +129,7 @@ rognes_affine(
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
-	int8_t m, int8_t x, int8_t gi, int8_t ge)
+	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
 {
 	/* init vectors */
 	uint16_t *mat = (uint16_t *)aligned_malloc(
@@ -142,8 +144,8 @@ rognes_affine(
 		uint16_t pad2[8];
 		uint16_t pe[2*BW];
 		uint16_t pad3[8];
+		uint16_t max[2*BW];
 	} w __attribute__(( aligned(16) ));
-	uint16_t maxv[2*BW] __attribute__(( aligned(16) ));
 
 	/* init char vec */
 	for(uint64_t i = 0; i < (uint64_t)BW; i++) { w.b[i] = 0; }
@@ -166,7 +168,7 @@ rognes_affine(
 
 	/* init maxv */
 	for(uint64_t i = 0; i < 2*BW; i++) {
-		maxv[i] = 0;
+		w.max[i] = w.pv[i];
 	}
 
 	vec mv(m), xv(x), giv(-gi), gev(-ge);
@@ -230,17 +232,19 @@ rognes_affine(
 			nv.store(&ptr[L*i]);
 			nf.store(&ptr[L*i + 2*2*BW]);
 
-			vec t; t.load(&maxv[L*i]); t = vec::max(t, nv);
-			t.store(&maxv[L*i]);
+			vec t; t.load(&w.max[L*i]); t = vec::max(t, nv);
+			t.store(&w.max[L*i]);
 		}
 		ptr += 3*2*BW;
 		debug("%p", ptr);
+
+		if(w.pv[BW] < w.max[BW] - xt) { break; }
 	}
 	free(mat);
 
 	int32_t max = 0;
 	for(uint64_t i = 0; i < (uint64_t)(2*BW / L); i++) {
-		vec t; t.load(&maxv[L*i]);
+		vec t; t.load(&w.max[L*i]);
 		debug("%d", t.hmax());
 		if(t.hmax() > max) { max = t.hmax(); }
 	}
@@ -258,7 +262,8 @@ int main_ext(int argc, char *argv[])
 			atoi(argv[4]),
 			atoi(argv[5]),
 			atoi(argv[6]),
-			atoi(argv[7]));
+			atoi(argv[7]),
+			atoi(argv[8]));
 		printf("%d\n", score);
 	} else if(strcmp(argv[1], "affine") == 0) {
 		int score = rognes_affine(
@@ -267,7 +272,8 @@ int main_ext(int argc, char *argv[])
 			atoi(argv[4]),
 			atoi(argv[5]),
 			atoi(argv[6]),
-			atoi(argv[7]));
+			atoi(argv[7]),
+			atoi(argv[8]));
 		printf("%d\n", score);
 	} else {
 		printf("./a.out linear AAA AAA 2 -3 -5 -1 30\n");
@@ -284,10 +290,10 @@ int main(int argc, char *argv[])
 
 	if(argc > 1) { return(main_ext(argc, argv)); }
 
-	int sl = rognes_linear(a, strlen(a), b, strlen(b), 2, -3, -5, -1);
+	int sl = rognes_linear(a, strlen(a), b, strlen(b), 2, -3, -5, -1, 30);
 	printf("%d\n", sl);
 
-	int sa = rognes_affine(a, strlen(a), b, strlen(b), 2, -3, -5, -1);
+	int sa = rognes_affine(a, strlen(a), b, strlen(b), 2, -3, -5, -1, 30);
 	printf("%d\n", sa);
 
 	return(0);
