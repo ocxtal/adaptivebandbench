@@ -15,6 +15,7 @@ error_rates = [0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95]
 bandwidths = [8, 16, 24, 32, 40, 48, 56, 64]
 xs = [-i for i in range(2, 9)]		# -1..-4
 gs = [-i for i in range(2, 13)]		# -1..-6
+params_list = [gs, xs, bandwidths, error_rates, lengths]
 
 # for debugging
 # lengths = [100, 500]
