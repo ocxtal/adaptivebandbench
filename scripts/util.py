@@ -208,6 +208,9 @@ def load_result_impl(filename):
 
 	return(array(linear), array(affine))
 
+def load_result(filename):
+	return(load_result_impl(filename))
+
 """
 def apply(argv): return(argv[0](*argv[1:]))
 
