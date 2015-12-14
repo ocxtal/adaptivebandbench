@@ -1,39 +1,76 @@
 
 # イントロ
 
-ここでは、ペアワイズローカルアライメントのソフトウェアを、seed-and-extend
-アプローチを用いて実装する際に必要になる、semi-globalアライメントの
-動的計画法のアルゴリズムを考える。ペアワイズローカルアライメントを動的計画法で
-解くアルゴリズムとして、Smith-WatermanのアルゴリズムとGotohのアルゴリズム
-がある。Semi-globalアライメントを計算するために、一般的にこれらのアルゴリズムを
-開始端を固定端とするように修正したものが用いられる。このため、Smith-Watermanの
-アルゴリズムを高速化したものをsemi-globalアライメントの高速化にも同様に
-適用することができる。Single-instruction-multiple-data (SIMD)による
-データレベルの並列計算を用いた並列化のアルゴリズムに、Rognesのアルゴリズムや
-Farrarのアルゴリズムがある。これらは長方形のDPマトリクスを、複数のセルを
-同時に計算することで高速に計算するアルゴリズムである。これらのアルゴリズムは
-ライブラリに実装したものが公開されていて、これらはBWAなどの実用的なソフトウェアで
-extensionのための動的計画法のルーチンとして用いられている。
+ここでは、塩基配列のペアワイズローカルアライメントのソフトウェアを
+seed-and-extendアプローチを用いて実装する際に必要になる、semi-globalアライメントの
+動的計画法のアルゴリズムを考える。
 
-一方、BLASTでは、動的計画法を高速化するために、動的計画法のマトリクスを効率よく
-狭めるヒューリスティックアルゴリズムが取り入れられている。BLASTで使われるアルゴリズム
-はX-dropと呼ばれる。これはマトリクス内のスコアの最大値を保存しておき、次に計算する
-セルのスコアがその最大値-X未満になったことをトリガにして伸長を終了するアルゴリズムである。
+近年の実用的なlocal alignmentを計算するソフトウェアは、そのほとんどが
+seed-and-extendと呼ばれるアプローチをとっている。その代表的なものに
+Basic Local Alignment Search Tool (BLAST) [1] がある。
 
-X-dropを用いたDPは最適パスから離れたセルを計算しないため、特に長い配列を
-アライメントする際に効果的なアルゴリズムであると考えられる。近年、PacBioやONTなどの
-ロングリードを出力するシーケンサが増えてきていて、これらを高速にアライメントする
-アルゴリズムの需要は高くなっている。
+BLASTのextendのステージでは、Smith-Waterman-Gotohのアルゴリズム [2, 3] を
+semi-globalに書き換え、X-dropと呼ばれるヒューリスティックを取り入れた特徴的な
+DPのアルゴリズム [4] を使用している。これは既に計算したマトリクス内のスコアの最大値を
+保存しておき、次に計算するセルのスコアがその最大値-X未満になったことをトリガに
+して伸長を終了するアルゴリズムである。ここではBLASTで用いられるアルゴリズムを
+X-drop DPと呼ぶ。
 
-ここでは、X-drop DPのアイデアを取り入れた、バンド幅を固定したbanded DPのアルゴリズムを
-提案する。このアルゴリズムをSIMD命令を用いて並列化して実装し、blastのX-drop DPと
-速度やrecallなどの特徴を比較する。
+類似のアルゴリズムにbanded DP [5] と呼ばれるものがある。これは、globalアライメントや
+semi-globalアライメントにおいて、DPマトリクスを一定の形 (多くは斜め45度の矩形)
+に切り取り、その内部のみスコアを計算するものである。これも強力なヒューリスティックであり、
+多くのライブラリ [6, 7] やアプリケーション [8, 9, 10] に利用されている。
+
+(メモ
+* SeqAnにbanded DPのルーチンがある。横向きにスライス
+* SSWはrefinementに(non-SIMDな) guided banded DPを実装している。横向きにスライス
+* MOSAIKの古いバージョンはシンプルなbanded DP。スライス方向はまだ調べていない
+* BWA-MEMはRognes方式のSSE2。横向き (斜めrognes)
+* BLASRはguided banded。スライス方向はまだ調べていない
+)
+
+一方、SWGのアルゴリズムをSingle-Instruction-Multiple-Data (SIMD)命令を使って高速化する
+方法も研究されている [11, 12, 13]。これらはfull DPを計算する高速化手法であるが、Rognesの
+アルゴリズム [12] を改良した、SSE2命令を使ったSIMD banded DPがBWA-MEM [9] で実装されて
+いる。また、しばしば塩基配列の類似度を計算するのに用いられる、編集距離を求めるアルゴリズムでは、
+レジスタの各ビットを独立な1ビットの変数と捉えた、bit-parallel演算を用いたアルゴリズムが存在する。
+これらはSIMD演算の一種と見ることができ、これらのアルゴリズムにはbanded DPを用いて計算領域を
+制限するアルゴリズムが提案されている [14, 15]。
+
+Farrarのstriped SWを実装したSSWライブラリ [7] は、SIMD命令を使ってfull DPを計算するルーチンと
+refinementのためのbanded DPを実装したライブラリで、nucleotideのアライメントを計算することができる。
+このライブラリは多くのアプリケーションでlocalアライメントを計算する部分に使われている [16, 17]。
+一方、このライブラリはfull DPを計算するため、banded DPと比べて計算時間のオーダーが大きいという
+欠点を持つ。これは長い配列のアライメントでは顕著な欠点となる。
+(メモ
+DPマトリクスを1行分しか保存しないような実装になっていて、メモリ使用量は大きくない、はず、
+ちゃんと読まないとわからない)
+
+近年のシーケンサの発展で、生成されるリード長はどんどん長くなり、PacBioやONTのリードは数kbに達する [?]。
+banded DPはこのような長い配列をアライメントする際に使える強力なヒューリスティックだが、
+PacBioやONTなど、エラーの多いリードをアライメントするときは、必要なバンド幅を事前に見積もりにくい
+という欠点がある。
+リード長はこれからさらに長くなっていくことが想定され、エラー率とリード長のトレードオフも、
+完全に解決されるにはまだ時間がかかると考えられる。
+このため、塩基配列のアライメントをターゲットにした、full DPやbanded DPより良いアルゴリズムの需要はいまだ高い。
+
+ここでは、banded DPとX-drop DPを参考に、dynamic banded DPのアルゴリズムを提案する。
+これはbanded DPと同様に斜めのバンドの内部を計算するアルゴリズムで、バンドを1セル伸長する
+ごとに進む方向を動的に決定するアルゴリズムである。動的に埋めるセルを決定する手法は
+X-drop DPに類似しているが、バンドの幅が一定に固定されている点はX-drop DPとは異なる。
+このアルゴリズムは塩基配列のアライメントをする場合にはSIMD命令を用いて効率良く計算できる
+ことを示し、そのrecallや計算速度などの特徴を既存のsemi-globalアライメントの実装と比較して
+明らかにする。
+
 
 # メソッド
 
-以下ではペアワイズsemi-globalアライメントのアルゴリズムを考える。
+以下ではペアワイズsemi-globalアライメントのアルゴリズムを考える。これはSWGのアルゴリズム
+[2, 3] の初期値の設定を修正したもので、開始端 (左上の端) は固定、終了端 (右下の端) は
+自由としたものである。
 また、スコアを計算する際のギャップペナルティには、線形ギャップペナルティモデルと
 アフィンギャップペナルティモデルの2種類を考える。
+
 
 ## semi-globalアライメントのアルゴリズム
 
@@ -45,55 +82,71 @@ X-dropを用いたDPは最適パスから離れたセルを計算しないため
 
 ## X-dropのアルゴリズム
 
-X-dropのアルゴリズムは、最初にBLASTで実装された。DPマトリクスを反対角線方向に
-伸びるバンドに切り、これを左上のバンドから順に計算する。バンド内のセルは右上から
+X-drop DPのアルゴリズム [4] は、BLAST [1] で実装された。DPマトリクスを反対角線
+方向に伸びるバンドに切り、これを左上のバンドから順に計算する。バンド内のセルは右上から
 順に計算する。以前に計算したすべてのセルのスコアの最大値(S_max)を保持しておく。
 バンドの両端の、スコアがS_max - Xより小さい部分を削り取ることでバンドの幅を調整
 する。以下に、ncbi blastnのgapped alignmentの実装 (blast_SemiGappedAlign)
-を元に記述した疑似コードを示す。
+を元に記述したアフィンギャップコストのアライメントを計算する疑似コードを示す。
 
-## 固定幅banded DP
+## dynamic banded DP
 
-X-dropのアルゴリズムは、最適パスから離れたセルを計算しないようにする
-ヒューリスティックだと捉えられる。最適パスから離れたセルを計算しないように、
-DPマトリクス内に事前にバンドを定めたものをここではbanded DPと呼ぶ。
-バンドの幅を、バンドを反対角線方向に切断した時に断面に並ぶセルの数と定義する。
-また、バンドの幅が途中で変化するものを、特に可変幅banded DPと呼ぶ。バンドの幅が
-変化しないものを固定幅banded DPと呼ぶ。
+オリジナルのbanded DPはChao et.al. [5]によって提案された。このアルゴリズムは
+一般にDPマトリクスをある形に切り取り、計算領域を狭めるアルゴリズムと解釈できる。
+ここでは、DPマトリクスを斜め45度の矩形に切り取るもののみを考え、これをbanded DPと呼ぶ。
+banded DPにおいて、バンドを反対角線方向に切った断面に並ぶセルのセット (vector)をlane
+と呼ぶ。(メモ: laneと呼んでいるがもう少し良い呼び方があったら変えたい) このlaneの長さを
+数をバンド幅と呼ぶ。
 
-ここでは固定幅banded DPで、反対角線方向に一列に並んだセルをひとまとめにして
-更新するアルゴリズムを考える。このアルゴリズムでは一列に並んだセルの間には
-依存関係がないため、SIMD命令を用いて高速に計算することができる。伸長の終了判定は
-blastのX-dropに似た方法を用いる。先端のバンドの中央のセルのスコアが
-それまでのバンドの中央のセルのスコアの最大値よりXだけ減少したら伸長をやめる。
+banded DPにおいて、バンド内のセルを計算する方法はいくつか考えられる。横方向もしくは縦方向に
+スライスする方法はX-drop DPに類似した方法で、SeqAn [6] やSSW library [7]
+のbanded DPで実装されている。BWA-MEM [9] で実装されたSSE2命令を使った
+SIMD banded DPもこのような計算順序をとっている。
+別の計算順序として、1レーンごとに端から計算する方法が考えられる。これはWozniak [11] により、
+SIMD命令を導入して並列化したアルゴリズムに用いられた方法と同じである。Wozniakによる実装は
+proteinのアライメントをターゲットにしており、置換行列をひく (retrieveする) 処理が
+並列化できないという欠点があった。
+塩基配列のアライメントでは一般にmatch / mismatchのモデル、もしくは4 x 4の置換行列で十分であるため、
+この欠点は解消できる。
+match / mismatchを検出し、それぞれのセルにどちらかの定数をロードする演算は、vectorに対する
+compare equal命令とblend命令の組み合わせ (多くの環境で2命令)、もしくはSSE2で利用出来るshuffle命令
+(pshufb命令 1命令) を使って高速に計算することができる。
+4 x 4の置換行列のretrieveも、2塩基のペアを4bitで表現することで16セルのshuffleに帰着するため、
+SSE2が利用できる環境では、pshufb命令を使って1命令で計算することができる。
+Kimura [15] はこの性質をうまく利用し、bit-parallel edit-distanceアルゴリズムをbanded DPに
+変形したものを提案した。
 
-
-
+dynamic banded DPは、banded DPをlaneごとに計算する方法を使用する。各laneを計算するごとに
+laneの端のセル同士を比較し、右上の方がスコアが大きければ右に、左下の方がスコアが大きければ下に
+次のlaneを配置する。上で述べた通り、塩基配列の置換行列は、proteinの置換行列と比べて高速にretrieveできる
+ため、ここでは塩基配列の置換行列に限定したアルゴリズムを考える。
+伸長の終了判定は、X-drop DPに似た方法を用いる。laneの中央のセルの最大値を記録し、最後に計算した
+laneの中央のセルのスコアがそれよりXだけ減少したら伸長をやめる。
 このアルゴリズムの疑似コードを以下に示す。
 
 
 # 実装
 
 X-dropのアルゴリズムはncbi blastnの実装をベースにした。
-固定幅banded DPはx86_64アーキテクチャのSSE2命令セットを使用し、16ビット幅のセルを
+dynamic banded DPはx86_64アーキテクチャのSSE2命令セットを使用し、16ビット幅のセルを
 8セル同時に計算する実装とした。バンド幅は8の倍数でコンパイル時に決定できるものにした。
 
 # 結果
 
 ## recallベンチマーク
 
-blast X-drop DPと固定幅banded DPに配列ペアを与え、同じスコアを返すかをチェックする
+blast X-drop DPとdynamic banded DPに配列ペアを与え、同じスコアを返すかをチェックする
 ベンチマークを行った。配列ペアは、pbsimを使ってE.coli NC_000913のリファレンス配列から
 simulated long readをモデルベースで生成し、リファレンス配列の対応する区間を切り出して
 作成した。pbsimに与えるパラメータは、リード長と塩基の一致率を、それぞれ
 100bp〜10kbp、65%〜95%の範囲で変化させた。
 pbsimに与えたすべてのパラメータと生成されたリードのプロファイルを図に示す。
 
-ここで生成したリードを、blast X-drop DPと固定幅banded DPに与えてスコアを計算した。
+ここで生成したリードを、blast X-drop DPとdynamic banded DPに与えてスコアを計算した。
 DPのスコア行列とギャップコストは、2つの整数 (x, y) を2 <= x <= 6と2 <= y <= 10
 の範囲で変化させ、linear-gap costの実装には(M, X, G) = (2, -x, -y)、
 affine-gap costの実装には(M, X, Gi, Ge) = (2, -x, -y, -2)を与えた。
-固定幅banded DPのバンド幅は8〜64の範囲で変化させた。X-dropのスレッショルドは
+dynamic banded DPのバンド幅は8〜64の範囲で変化させた。X-dropのスレッショルドは
 60*giとした。
 
 
@@ -247,7 +300,7 @@ array([[ 927,  976,  999,  996,  994,  999,  999],
 いずれかに、長さLの{A, C, G, T}が等確率でランダムに並んだ配列を[100, 600]
 のランダムな位置に挿入したデータを作成した。Lは[0, 63]で変化させた。
 スコアを(M, X, G) = (2, -4, -4)および(M, X, Gi, Ge) = (2, -4, -4, -2)とし、
-バンド幅を[8, 64]に変化させてblastと固定幅banded DPとで同じ結果が得られるかを
+バンド幅を[8, 64]に変化させてblastとdynamic banded DPとで同じ結果が得られるかを
 調べた。この結果を図5に示す。
 linearもaffineも挿入長さがBW-4程度まではほぼblastと同じ結果を得たが、それ以上の
 挿入長さでは急激に一致率が低下した。
@@ -395,13 +448,13 @@ array([[ 945, 1000, 1000, 1000, 1000, 1000, 1000, 1000],
 スコアを出すまでの計算時間を測定した。
 
 比較対象として、blast X-drop DP (blast)およびこれをSIMDで並列化したもの
-(simdblast)、固定幅banded DP (ddiag)、およびSSW libraryの16ビットの実装 (ssw)
-を用いた。また、参考として32セル固定幅banded DPについて、動的に方向を決定しないもの
+(simdblast)、dynamic banded DP (ddiag)、およびSSW libraryの16ビットの実装 (ssw)
+を用いた。また、参考として32セルdynamic banded DPについて、動的に方向を決定しないもの
 (斜め45度のバンドを計算するもの) を、斜めに埋める方法 (diag) と横に埋める方法 (rognes)
 で実装したものについても計算時間を測定した。図6に結果を示す。
 
 linearではblastが最も遅いアルゴリズムとなった。SIMDで並列化したblast (simdblast)
-は元のblastの実装より3倍程度高速になったが、固定幅banded DP (ddiag) はそれより
+は元のblastの実装より3倍程度高速になったが、dynamic banded DP (ddiag) はそれより
 20%程度高速だった。SSWは短い配列長に対しては高速だが、DPマトリクスを全て計算する
 アルゴリズムを実装しており、計算量が与える配列a、bの長さに対してO(|a||b|)で増加する。
 結果もこの傾向を示しており、1kを超えるような長い配列に対してはddiagより遅くなった。
@@ -419,40 +472,60 @@ affineでも全体の傾向はlinearと同じだった。simdblastに対するdd
 
 recallベンチマークの結果は、一致率0.75〜0.95、長さ1k〜10kの配列をスコア
 (1, -2, -2, -1)でアライメントするといった、ロングリードのアライメントで一般的な
-設定で固定幅banded DPがblast X-drop DPと実用上十分な程度に同じ結果を計算できる
+設定でdynamic banded DPがblast X-drop DPと実用上十分な程度に同じ結果を計算できる
 ことを示している (図1、2)。実験では、(1, -1, -2, -1)といった、linear phaseとの
 遷移境界に近いスコア行列と、スコアの期待値が負となるスコア行列でblastとddiagの
 結果が一致しない割合が増加した (図3)。linear phaseとの境界近くではddiagが
 blastより良い結果を示す傾向がある (図4) スコアの期待値が負となるスコア行列は実用上用いることが
 ないので、この領域は無視してよい。
 
-このような設定に対して、固定幅banded DPはblast X-drop DPより
-典型的に7倍程度高速にスコアを計算することができる。blast X-drop DPと固定幅banded DPの
+このような設定に対して、dynamic banded DPはblast X-drop DPより
+典型的に7倍程度高速にスコアを計算することができる。blast X-drop DPとdynamic banded DPの
 計算量はO(min(|a|, |b|))であり、これはSSW libraryに用いられているFarrarの
 アルゴリズムのO(|a||b|)よりも良い。ベンチマークは[1k, 10k]程度の配列をアライメントする際、
 ddiagはSSW libraryよりも高速にスコアを計算できることを示している。
 
-blastと固定幅banded DPの結果が一致しない
+blastとdynamic banded DPの結果が一致しない
 スコアの組み合わせはほぼこの2つの領域にかぶっていて、これはこの2つの領域では
 アライメントが安定しないためと考えられる。
 
 
-固定幅banded DPはバンド幅が固定されているため、長いindelを挟んだ配列を捉えられない
+dynamic banded DPはバンド幅が固定されているため、長いindelを挟んだ配列を捉えられない
 欠点を持つ。ベンチマークはBW-4程度の長さまでは十分に捉えることができ、それより長いindelに
 対しては急激にキャプチャ率が低下する。このような特性はindelを陽に考慮してアライメントする
 ときに好ましい特性であり、キャプチャしたいindelの長さの分布が分かっている場合に
 必要なバンド幅を決定できることを示している。
 
-固定幅banded DPにおけるX-dropスレッショルドを、キャプチャできる最長のindelに対する
+dynamic banded DPにおけるX-dropスレッショルドを、キャプチャできる最長のindelに対する
 ペナルティと同じ程度になるように定めるとする。この値は32セル、(M, X, G) = (2, -4, -4)の
 linearのとき110程度、(M, X, Gi, Ge) = (2, -4, -4, -2)のaffineのとき60程度となる。
 
 この値はblastnのデフォルトのX-dropスレッショルド27 (bits)と同程度の値であり、
 blastnでキャプチャできるアライメントを大きく損ねないことがわかる。(わかる???)
 
-これらの結果から、固定幅banded DPは、これまでロングリードのDPに用いられてきた
+これらの結果から、dynamic banded DPは、これまでロングリードのDPに用いられてきた
 blast X-drop DPやFarrarのアルゴリズムを置き換えることができるといえる。
 また、このベンチマークでは一致率の上界を0.95としたが、さらに一致率の高いショートリード
 (98〜99%程度) のリードに対しても問題なく適用できることが想定される。
 
+
+# リファレンス
+
+1. Altschull, Stephen F., et al. "Basic local alignment search tool." J. Mol. Biol 215 (1990): 403-410.
+2. Smith, Temple F., and Michael S. Waterman. "Identification of common molecular subsequences." Journal of molecular biology 147.1 (1981): 195-197.
+3. Gotoh, Osamu. "An improved algorithm for matching biological sequences." Journal of molecular biology 162.3 (1982): 705-708.
+4. https://github.com/elucify/blast-docs/wiki/Gapped-Alignment-Phase "The Developer's Guide to BLAST: Gapped Alignment Phase"
+5. Chao, Kun-Mao, William R. Pearson, and Webb Miller. "Aligning two sequences within a specified diagonal band." Computer applications in the biosciences: CABIOS 8.5 (1992): 481-487.
+6. Döring, Andreas, et al. "SeqAn an efficient, generic C++ library for sequence analysis." BMC bioinformatics 9.1 (2008): 11.
+7. Zhao, Mengyao, et al. "SSW library: An SIMD smith-waterman C/C++ library for use in genomic applications." (2013): e82138.
+8. Lee, Wan-Ping, et al. "MOSAIK: a hash-based algorithm for accurate next-generation sequencing short-read mapping." PloS one 9.3 (2014): e90581.
+9. Li, Heng. "Aligning sequence reads, clone sequences and assembly contigs with BWA-MEM." arXiv preprint arXiv:1303.3997 (2013).
+10. Chaisson, Mark J., and Glenn Tesler. "Mapping single molecule sequencing reads using basic local alignment with successive refinement (BLASR): application and theory." BMC bioinformatics 13.1 (2012): 238.
+11. Wozniak, Andrzej. "Using video-oriented instructions to speed up sequence comparison." Computer applications in the biosciences: CABIOS 13.2 (1997): 145-150.
+12. Rognes, Torbjørn, and Erling Seeberg. "Six-fold speed-up of Smith–Waterman sequence database searches using parallel processing on common microprocessors." Bioinformatics 16.8 (2000): 699-706.
+13. Farrar, Michael. "Striped Smith–Waterman speeds database searches six times over other SIMD implementations." Bioinformatics 23.2 (2007): 156-161.
+14. Myers, Gene. "A fast bit-vector algorithm for approximate string matching based on dynamic programming." Journal of the ACM (JACM) 46.3 (1999): 395-415.
+15. Kimura, Kouichi, Asako Koike, and Kenta Nakai. "A bit-parallel dynamic programming algorithm suitable for DNA sequence alignment." Journal of bioinformatics and computational biology 10.04 (2012): 1250002.
+16. Li, Heng, and Richard Durbin. "Fast and accurate long-read alignment with Burrows–Wheeler transform." Bioinformatics 26.5 (2010): 589-595.
+17. Langmead, Ben, and Steven L. Salzberg. "Fast gapped-read alignment with Bowtie 2." Nature methods 9.4 (2012): 357-359.
 
