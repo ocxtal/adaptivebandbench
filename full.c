@@ -55,7 +55,8 @@ sw_result_t sw_linear(
 	}
 	if(max.score == 0) { max = (maxpos_t){ 0, 0, 0 }; }
 
-	sw_result_t result = {
+	sw_result_t result;
+	result = (sw_result_t){
 		.score = max.score,
 		.apos = max.apos,
 		.bpos = max.bpos,
@@ -144,7 +145,8 @@ sw_result_t sw_affine(
 	}
 	if(max.score == 0) { max = (maxpos_t){ 0, 0, 0 }; }
 
-	sw_result_t result = {
+	sw_result_t result;
+	result = (sw_result_t){
 		.score = max.score,
 		.apos = max.apos,
 		.bpos = max.bpos,
