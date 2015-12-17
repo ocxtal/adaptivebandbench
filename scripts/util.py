@@ -53,7 +53,6 @@ def ints(s):
 
 
 def align(align_paths, alg, ref, read, m, x, gi, ge, xdrop_coef):
-	print(align_paths)
 	return([[ints(s) for s in subprocess.check_output([
 		path, alg, ref, read, str(m), str(x), str(gi), str(ge),
 		str((60 + xdrop_coef) * -gi)]).split()]
