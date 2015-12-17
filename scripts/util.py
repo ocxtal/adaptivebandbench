@@ -5,7 +5,6 @@ import subprocess
 import random
 from params import *
 
-
 # initalize rand seed
 random.seed(None)
 
@@ -48,12 +47,17 @@ def parse_maf(maf_path):
 
 			yield((ref, read))
 
-def align(align_paths, algorithms, ref, read, m, x, gi, ge, xdrop_coef):
-	return([[int(subprocess.check_output([
+def ints(s):
+	try: return(int(s))
+	except ValueError: return(str(s))
+
+
+def align(align_paths, alg, ref, read, m, x, gi, ge, xdrop_coef):
+	print(align_paths)
+	return([[ints(s) for s in subprocess.check_output([
 		path, alg, ref, read, str(m), str(x), str(gi), str(ge),
-		str((60 + xdrop_coef) * -gi)]).split()[0])
-			for path in align_paths]
-			for alg in algorithms])
+		str((60 + xdrop_coef) * -gi)]).split()]
+			for path in align_paths])
 
 # parameter generation
 def generate_params(params_list, count):
@@ -69,15 +73,6 @@ def randbase():
 def default_modifier(seq, param):
 	return(seq + ''.join([randbase() for i in range(100)]))
 
-# util
-def clip(x, min, max):
-	if x < min:
-		return min
-	elif x > max:
-		return max
-	else:
-		return x
-
 def evaluate_impl(pbsim_path, ref_path, bin_path,
 	gi, x, bandwidth, error_rate, length, count,
 	modifier, param1, param2):
@@ -90,53 +85,64 @@ def evaluate_impl(pbsim_path, ref_path, bin_path,
 		error_rate)
 	pairs = parse_maf('./{0}_0001.maf'.format(prefix))
 
+	results_linear = []
+	results_affine = []
 	tot = 0
-	hist = [[0 for i in range(hist_size)], [0 for j in range(hist_size)]]
-	# acc = [0, 0]
-	# fail = [0, 0]
-
-	print(hist)
-
 	for pair in pairs:
 
 		ref = modifier(pair[0], param1)
 		read = modifier(pair[1], param2)
 
-		# print(ref, read)
-
-		scores = align(
-			['{0}/blast-{1}'.format(bin_path, bandwidth), '{0}/ddiag-{1}'.format(bin_path, bandwidth)],
-			['linear', 'affine'], ref, read,
+		results_linear.append(align(
+			['{0}/full-{1}'.format(bin_path, bandwidth),
+			 '{0}/blast-{1}'.format(bin_path, bandwidth),
+			 '{0}/ddiag-{1}'.format(bin_path, bandwidth)],
+			'linear', ref, read,
 			2, x, gi, -2,		# m, x, gi, ge
-			max(param1, param2))
-		
-		indices = [clip(score[1] - score[0] + hist_size/2, 0, hist_size-1) for score in scores]
-		# print(indices, scores)
-		for (i, index) in zip(range(len(indices)), indices):
-			hist[i][index] = hist[i][index] + 1
-		tot = tot + 1
+			max(param1, param2)))
 
-		# print(scores, succ, acc)
+		results_affine.append(align(
+			['{0}/full-{1}'.format(bin_path, bandwidth),
+			 '{0}/blast-{1}'.format(bin_path, bandwidth),
+			 '{0}/ddiag-{1}'.format(bin_path, bandwidth)],
+			'affine', ref, read,
+			2, x, gi, -2,		# m, x, gi, ge
+			max(param1, param2)))
+		
+		tot = tot + 1
 		if tot == count:
 			break
 	
 	cleanup_pbsim(prefix)
-
-	print(hist)
-	# print(bandwidth, m, x, gi, ge, error_rate, length, acc)
-	return(hist)
-
+	return([results_linear, results_affine])
 
 def evaluate(pbsim_path, ref_path, bin_path, gi, x, bandwidth, error_rate, length, count):
 	return(evaluate_impl(pbsim_path, ref_path, bin_path,
 		gi, x, bandwidth, error_rate, length, count,
 		default_modifier, 0, 1))
 
+"""
+def aggregate_hist():
+	indices = [clip(score[1] - score[0] + hist_size/2, 0, hist_size-1) for score in scores]
+	# print(indices, scores)
+	for (i, index) in zip(range(len(indices)), indices):
+		hist[i][index] = hist[i][index] + 1
+	tot = 0
+	hist = [[0 for i in range(hist_size)], [0 for j in range(hist_size)]]
+"""
 
 # utility
+def clip(x, min, max):
+	if x < min:
+		return min
+	elif x > max:
+		return max
+	else:
+		return x
+
 def num(s):
-	try: return int(s)
-	except ValueError: return float(s)
+	try: return(int(s))
+	except ValueError: return(float(s))
 
 
 def array(size):
@@ -154,18 +160,25 @@ def get_array(arr, indices):
 		return(arr[indices[0]])
 	else:
 		return(get_array(arr[indices[0]], indices[1:]))
+def slice_impl(arr, index):
+	if index == -1:
+		return(arr)
+	else:
+		return(arr[index])
+def slice_array(arr, indices):
 
-def default_aggregator(hist):
+	def slice_array_intl(arr, indices, fn):
+		if indices[0] == -1:
+			return([fn(a, indices[1:]) for a in arr])
+		else:
+			return(fn(arr[indices[0]], indices[1:]))
 
-	return(hist[hist_size/2])
+	if len(indices) == 1:
+		return(slice_array_intl(arr, indices, lambda x, y: x))
+	else:
+		return(slice_array_intl(arr, indices, slice_array))
 
-
-def hist_sum_aggregator(hist):
-
-	return(sum(hist[hist_size/2:hist_size/2 + 10]))
-
-
-def aggregate_impl(input_file, output_file, params_list, aggregator):
+def aggregate(input_file, output_file, params_list):
 
 	dimensions = [len(p) for p in params_list]
 	results_linear = array(dimensions)
@@ -184,21 +197,16 @@ def aggregate_impl(input_file, output_file, params_list, aggregator):
 
 		r = p[len(params_list) + 1:]
 
-		set_array(results_linear, indices, aggregator(r[0]))
-		set_array(results_affine, indices, aggregator(r[1]))
+		set_array(results_linear, indices, r[0])
+		set_array(results_affine, indices, r[1])
 
 	with open(output_file, "w") as w:
 		w.write(str(results_linear) + '\n')
 		w.write(str(results_affine) + '\n')
 
-def aggregate(input_file, output_file, params_list):
-
-	aggregate_impl(input_file, output_file, params_list, default_aggregator)
-
-
 def load_result_impl(filename):
-	
-	from numpy import array
+
+	# from numpy import array
 
 	linear = []
 	affine = []
@@ -206,10 +214,55 @@ def load_result_impl(filename):
 		linear = eval(f.readline())
 		affine = eval(f.readline())
 
-	return(array(linear), array(affine))
+	return(linear, affine)
 
 def load_result(filename):
 	return(load_result_impl(filename))
+
+# print utilities
+def tab_formatter(arr):
+	return('\n'.join(['\t'.join(e) for e in arr]))
+
+def extract_labels(params_list, indices):
+	label = [params_list[0]] if indices[0] == -1 else []
+	if len(indices) == 1:
+		return(label)
+	else:
+		return(label + extract_labels(params_list[1:], indices[1:]))
+
+def score_identity(elems, comp_pair = [0, 1]):
+	try: return(sum([elem[comp_pair[0]][0] == elem[comp_pair[1]][0] for elem in elems]))
+	except TypeError: return('-')
+
+def score_difference(elems, bin_size = 30, comp_pair = [0, 1]):
+	bin = [0 for i in range(bin_size)]
+	try:
+		for elem in elems:
+			bin[clip(elem[comp_pair[0]][0] - elem[comp_pair[1]][0] + bin_size/2, 0, bin_size-1)] += 1
+		return([str(e) for e in bin])
+	except TypeError: return([str(e) for e in bin])
+	# return([clip(elem[0][0] - e[0] + bin_size/2, 0, bin_size-1) for e in elem[1:]])
+
+def table(arr, fn, indices, params_list = params_list, formatter = tab_formatter, comp_pair = [0, 1]):
+	# indices must have two -1's
+	labels = extract_labels(params_list, indices)
+	table_elems = [['$'] + [str(e) for e in labels[1]]]
+	table_elems += [[str(l)] + [str(fn(e, comp_pair = comp_pair)) for e in es]
+		for (l, es) in zip(labels[0], slice_array(arr, indices))]
+	print(formatter(table_elems))
+
+def hist(arr, fn, indices, params_list = params_list, formatter = tab_formatter, comp_pair = [0, 1], bin_size = 30):
+	# indices must have just one -1 in it
+	bins = [['%'] + [str(i) for i in range(bin_size)]]
+	labels = extract_labels(params_list, indices)
+	for (label, result) in zip(labels[0], slice_array(arr, indices)):
+		bins.append([str(label)] + fn(result, bin_size = bin_size, comp_pair = comp_pair))
+	print(bins)
+	print(formatter(bins))
+	# print('\t'.join([str(e) for e in bin]))
+
+
+
 
 """
 def apply(argv): return(argv[0](*argv[1:]))
