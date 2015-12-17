@@ -41,15 +41,15 @@ sw_result_t sw_linear(
 	/* init */
 	maxpos_t max = { 0, 0, 0 };
 	mat[a(0, 0)] = 0;
-	for(uint64_t i = 1; i < alen+1; i++) { mat[a(i, 0)] = i * ge; }
-	for(uint64_t j = 1; j < blen+1; j++) { mat[a(0, j)] = j * ge; }
+	for(uint64_t i = 1; i < alen+1; i++) { mat[a(i, 0)] = i * gi; }
+	for(uint64_t j = 1; j < blen+1; j++) { mat[a(0, j)] = j * gi; }
 
 	for(uint64_t j = 1; j < blen+1; j++) {
 		for(uint64_t i = 1; i < alen+1; i++) {
 			int16_t score = mat[a(i, j)] = MAX3(
 				mat[a(i - 1, j - 1)] + s(i, j),
-				mat[a(i, j - 1)] + ge,
-				mat[a(i - 1, j)] + ge);
+				mat[a(i, j - 1)] + gi,
+				mat[a(i - 1, j)] + gi);
 			if(score >= max.score) { max = (maxpos_t){ score, i, j }; }
 		}
 	}
@@ -65,10 +65,10 @@ sw_result_t sw_linear(
 	};
 	uint32_t path_index = max.apos + max.bpos + 1;
 	while(max.apos != 0 && max.bpos != 0) {
-		if(mat[a(max.apos, max.bpos)] == mat[a(max.apos, max.bpos - 1)] + ge) {
+		if(mat[a(max.apos, max.bpos)] == mat[a(max.apos, max.bpos - 1)] + gi) {
 			max.bpos--;
 			result.path[--path_index] = 'I';
-		} else if(mat[a(max.apos, max.bpos)] == mat[a(max.apos - 1, max.bpos)] + ge) {
+		} else if(mat[a(max.apos, max.bpos)] == mat[a(max.apos - 1, max.bpos)] + gi) {
 			max.apos--;
 			result.path[--path_index] = 'D';
 		} else {
