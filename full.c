@@ -72,9 +72,6 @@ sw_result_t sw_linear(
 			max.apos--;
 			result.path[--path_index] = 'D';
 		} else {
-			if(mat[a(max.apos, max.bpos)] == 0) {
-				break;
-			}
 			if(mat[a(max.apos, max.bpos)] == mat[a(max.apos - 1, max.bpos - 1)] + x) {
 				result.path[--path_index] = 'X';
 			} else {
@@ -170,9 +167,6 @@ sw_result_t sw_affine(
 			max.apos--;
 			result.path[--path_index] = 'D';
 		} else {
-			if(mat[a(max.apos, max.bpos)] == 0) {
-				break;
-			}
 			if(mat[a(max.apos, max.bpos)] == mat[a(max.apos - 1, max.bpos - 1)] + x) {
 				result.path[--path_index] = 'X';
 			} else {
