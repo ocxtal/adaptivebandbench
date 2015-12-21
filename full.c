@@ -47,7 +47,7 @@ sw_result_t sw_linear(
 	for(uint64_t j = 1; j < blen+1; j++) {
 		for(uint64_t i = 1; i < alen+1; i++) {
 			int16_t score = mat[a(i, j)] = MAX4(
-				INT16_MIN - x - gi
+				INT16_MIN - x - gi,
 				mat[a(i - 1, j - 1)] + s(i, j),
 				mat[a(i, j - 1)] + gi,
 				mat[a(i - 1, j)] + gi);
