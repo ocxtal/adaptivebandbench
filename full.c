@@ -35,19 +35,20 @@ sw_result_t sw_linear(
 	#define a(p, q)		_a(p, q, alen)
 	#define s(p, q)		( (a[(p) - 1] == b[(q) - 1]) ? m : x )
 
+	int16_t const min = INT16_MIN - x - gi;
+
 	int16_t *mat = (int16_t *)malloc(
 		(alen + 1) * (blen + 1) * sizeof(int16_t));
 
 	/* init */
 	maxpos_t max = { 0, 0, 0 };
 	mat[a(0, 0)] = 0;
-	for(uint64_t i = 1; i < alen+1; i++) { mat[a(i, 0)] = i * gi; }
-	for(uint64_t j = 1; j < blen+1; j++) { mat[a(0, j)] = j * gi; }
+	for(uint64_t i = 1; i < alen+1; i++) { mat[a(i, 0)] = MAX2(min, i * gi); }
+	for(uint64_t j = 1; j < blen+1; j++) { mat[a(0, j)] = MAX2(min, j * gi); }
 
 	for(uint64_t j = 1; j < blen+1; j++) {
 		for(uint64_t i = 1; i < alen+1; i++) {
-			int16_t score = mat[a(i, j)] = MAX4(
-				INT16_MIN - x - gi,
+			int16_t score = mat[a(i, j)] = MAX4(min,
 				mat[a(i - 1, j - 1)] + s(i, j),
 				mat[a(i, j - 1)] + gi,
 				mat[a(i - 1, j)] + gi);
@@ -112,6 +113,8 @@ sw_result_t sw_affine(
 	#define e(p, q)		_a(p, 3*(q)+2, alen)
 	#define s(p, q)		( (a[(p) - 1] == b[(q) - 1]) ? m : x )
 
+	int16_t const min = INT16_MIN - x - gi;
+
 	int16_t *mat = (int16_t *)malloc(
 		3 * (alen + 1) * (blen + 1) * sizeof(int16_t));
 
@@ -119,12 +122,12 @@ sw_result_t sw_affine(
 	maxpos_t max = { 0, 0, 0 };
 	mat[a(0, 0)] = mat[f(0, 0)] = mat[e(0, 0)] = 0;
 	for(uint64_t i = 1; i < alen+1; i++) {
-		mat[a(i, 0)] = mat[f(i, 0)] = gi + (i - 1) * ge;
-		mat[e(i, 0)] = gi + (i - 1) * ge + gi - ge;
+		mat[a(i, 0)] = mat[f(i, 0)] = MAX2(min, gi + (i - 1) * ge);
+		mat[e(i, 0)] = MAX2(min, gi + (i - 1) * ge + gi - ge);
 	}
 	for(uint64_t j = 1; j < blen+1; j++) {
-		mat[a(0, j)] = mat[e(0, j)] = gi + (j - 1) * ge;
-		mat[f(0, j)] = gi + (j - 1) * ge + gi - ge;
+		mat[a(0, j)] = mat[e(0, j)] = MAX2(min, gi + (j - 1) * ge);
+		mat[f(0, j)] = MAX2(min, gi + (j - 1) * ge + gi - ge);
 	}
 
 	for(uint64_t j = 1; j < blen+1; j++) {
@@ -135,8 +138,7 @@ sw_result_t sw_affine(
 			int16_t score_e = mat[e(i, j)] = MAX2(
 				mat[a(i, j - 1)] + gi,
 				mat[e(i, j - 1)] + ge);
-			int16_t score = mat[a(i, j)] = MAX4(
-				INT16_MIN - x - gi,
+			int16_t score = mat[a(i, j)] = MAX4(min,
 				mat[a(i - 1, j - 1)] + s(i, j),
 				score_f, score_e);
 			if(score >= max.score) { max = (maxpos_t){ score, i, j }; }
