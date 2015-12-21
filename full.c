@@ -46,7 +46,8 @@ sw_result_t sw_linear(
 
 	for(uint64_t j = 1; j < blen+1; j++) {
 		for(uint64_t i = 1; i < alen+1; i++) {
-			int16_t score = mat[a(i, j)] = MAX3(
+			int16_t score = mat[a(i, j)] = MAX4(
+				INT16_MIN - x - gi
 				mat[a(i - 1, j - 1)] + s(i, j),
 				mat[a(i, j - 1)] + gi,
 				mat[a(i - 1, j)] + gi);
@@ -134,7 +135,8 @@ sw_result_t sw_affine(
 			int16_t score_e = mat[e(i, j)] = MAX2(
 				mat[a(i, j - 1)] + gi,
 				mat[e(i, j - 1)] + ge);
-			int16_t score = mat[a(i, j)] = MAX3(
+			int16_t score = mat[a(i, j)] = MAX4(
+				INT16_MIN - x - gi,
 				mat[a(i - 1, j - 1)] + s(i, j),
 				score_f, score_e);
 			if(score >= max.score) { max = (maxpos_t){ score, i, j }; }
