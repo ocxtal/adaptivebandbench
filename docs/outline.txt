@@ -6,61 +6,53 @@ seed-and-extendアプローチを用いて実装する際に必要になる、se
 動的計画法のアルゴリズムを考える。
 
 近年の実用的なlocal alignmentを計算するソフトウェアは、そのほとんどが
-seed-and-extendと呼ばれるアプローチをとっている。その代表的なものに
-Basic Local Alignment Search Tool (BLAST) [1] がある。
+seedの列挙とseedの伸長の2つのステージから構成され、seed-and-extend法と呼ばれる [1]。
+代表的なものにBasic Local Alignment Search Tool (BLAST) [2] がある。
 
-BLASTのextendのステージでは、Smith-Waterman-Gotohのアルゴリズム [2, 3] を
+BLASTのextendのステージでは、Smith-Waterman-Gotohのアルゴリズム (SWG) [3, 4] を
 semi-globalに書き換え、X-dropと呼ばれるヒューリスティックを取り入れた特徴的な
-DPのアルゴリズム [4] を使用している。これは既に計算したマトリクス内のスコアの最大値を
-保存しておき、次に計算するセルのスコアがその最大値-X未満になったことをトリガに
-して伸長を終了するアルゴリズムである。ここではBLASTで用いられるアルゴリズムを
-X-drop DPと呼ぶ。
-
-類似のアルゴリズムにbanded DP [5] と呼ばれるものがある。これは、globalアライメントや
+DPのアルゴリズム [5] を使用している。これはマトリクスを1セルずつ (1行ごとに左端のセルから)
+計算するとき、既に計算したマトリクス内のスコアの最大値を保存しておき、
+次に計算するセルのスコアがその最大値-X未満になったことをトリガにして伸長を終了するアルゴリズムである。
+ここではBLASTで用いられるDPのアルゴリズムをX-drop DPと呼ぶ。
+類似のアルゴリズムにbanded DP [6] と呼ばれるものがある。これは、globalアライメントや
 semi-globalアライメントにおいて、DPマトリクスを一定の形 (多くは斜め45度の矩形)
-に切り取り、その内部のみスコアを計算するものである。これも強力なヒューリスティックであり、
-多くのライブラリ [6, 7] やアプリケーション [8, 9, 10] に利用されている。
+に切り取り、その内部のみスコアを計算するものである。これはsemi-globalのDPに適した
+ヒューリスティックで、多くのライブラリ [7, 8] やアプリケーション [9, 10, 11] に利用されている。
 
-(メモ
-* SeqAnにbanded DPのルーチンがある。横向きにスライス
-* SSWはrefinementに(non-SIMDな) guided banded DPを実装している。横向きにスライス
-* MOSAIKの古いバージョンはシンプルなbanded DP。スライス方向はまだ調べていない
-* BWA-MEMはRognes方式のSSE2。横向き (斜めrognes)
-* BLASRはguided banded。スライス方向はまだ調べていない
-)
 
-一方、SWGのアルゴリズムをSingle-Instruction-Multiple-Data (SIMD)命令を使って高速化する
-方法も研究されている [11, 12, 13]。これらはfull DPを計算する高速化手法であるが、Rognesの
-アルゴリズム [12] を改良した、SSE2命令を使ったSIMD banded DPがBWA-MEM [9] で実装されて
-いる。また、しばしば塩基配列の類似度を計算するのに用いられる、編集距離を求めるアルゴリズムでは、
-レジスタの各ビットを独立な1ビットの変数と捉えた、bit-parallel演算を用いたアルゴリズムが存在する。
-これらはSIMD演算の一種と見ることができ、これらのアルゴリズムにはbanded DPを用いて計算領域を
-制限するアルゴリズムが提案されている [14, 15]。
+(X-drop DPやbanded DPによる計算領域の削減とは) 別のアプローチに、Single-Instruction-Multiple-Data
+(SIMD)命令を使ったデータレベルの並列計算の利用がある。SIMD命令を使うと、複数 (8個や16個) の
+セルに対する計算を並列に実行することができる。
+protein配列のfull DPの計算をSIMD命令を使って高速化する手法は、Wozniakのアルゴリズム [12]、
+Rognesのアルゴリズム [13]、Farrarのアルゴリズム [14] など、いくつかの方法が提案されている。
+この中でも特にFarrarのアルゴリズム [14] は、多くの塩基配列のペアワイズローカルアライメントの
+アプリケーション [15, 16] やライブラリ [8] に応用されている。
+SIMD命令を使った並列アルゴリズムとbanded DPの組み合わせも存在し、BWA-MEM [10] はseedの伸長に
+Rognesのアルゴリズム [13] をbanded DPに修正したものを使用している。
 
-Farrarのstriped SWを実装したSSWライブラリ [7] は、SIMD命令を使ってfull DPを計算するルーチンと
-refinementのためのbanded DPを実装したライブラリで、nucleotideのアライメントを計算することができる。
-このライブラリは多くのアプリケーションでlocalアライメントを計算する部分に使われている [16, 17]。
-一方、このライブラリはfull DPを計算するため、banded DPと比べて計算時間のオーダーが大きいという
-欠点を持つ。これは長い配列のアライメントでは顕著な欠点となる。
-(メモ
-DPマトリクスを1行分しか保存しないような実装になっていて、メモリ使用量は大きくない、はず、
-ちゃんと読まないとわからない)
 
-近年のシーケンサの発展で、生成されるリード長はどんどん長くなり、PacBioやONTのリードは数kbに達する [?]。
-banded DPはこのような長い配列をアライメントする際に使える強力なヒューリスティックだが、
-PacBioやONTなど、エラーの多いリードをアライメントするときは、必要なバンド幅を事前に見積もりにくい
-という欠点がある。
-リード長はこれからさらに長くなっていくことが想定され、エラー率とリード長のトレードオフも、
+近年のシーケンサの発展で、生成されるリードはますます長くなり、PacBioやONTのリードは数kbに達する [?]。
+full DPはFarrarのアルゴリズムによって効率良く計算ができるが、時間計算量が O(|a||b|)
+(|a|と|b|はDPに与える2本の配列の長さ) となるため、このような長い配列のアライメントには向かない。
+banded DPは事前に埋める領域が決定される必要があり、エラーの多い長い配列、特に、ins / del rateが
+偏っている配列では領域を適切に決定するのが難しい (もしくは、幅が十分でないと最適解を発見できない)。
+X-drop DPはfull DPやbanded DPの欠点を解決しているが、SIMD命令を用いた並列な実装は存在せず、
+最近のCPUの演算能力を使い切ることができない欠点を持つ。
+シーケンサの出力するリード長はこれからさらに長くなっていくことが想定され、エラー率とリード長のトレードオフも、
 完全に解決されるにはまだ時間がかかると考えられる。
-このため、塩基配列のアライメントをターゲットにした、full DPやbanded DPより良いアルゴリズムの需要はいまだ高い。
+このため、長い塩基配列のアライメントをターゲットにした、full DPやbanded DPより使いやすく、
+X-drop DPより高速なアルゴリズムの需要は高い。
 
-ここでは、banded DPとX-drop DPを参考に、dynamic banded DPのアルゴリズムを提案する。
+ここでは、banded DPとX-drop DPを参考にした、dynamic banded DPのアルゴリズムを提案する。
 これはbanded DPと同様に斜めのバンドの内部を計算するアルゴリズムで、バンドを1セル伸長する
 ごとに進む方向を動的に決定するアルゴリズムである。動的に埋めるセルを決定する手法は
 X-drop DPに類似しているが、バンドの幅が一定に固定されている点はX-drop DPとは異なる。
-このアルゴリズムは塩基配列のアライメントをする場合にはSIMD命令を用いて効率良く計算できる
-ことを示し、そのrecallや計算速度などの特徴を既存のsemi-globalアライメントの実装と比較して
-明らかにする。
+このアルゴリズムは、2本の塩基配列のペアワイズアライメントを、マッチ-ミスマッチモデルや
+4 x 4の置換行列のモデルで計算する場合にSIMD命令を用いて実装でき、既存の類似手法と比較して
+効率の良い計算できることを示す。
+次に、recallや計算速度などを既存のX-drop DPや
+いくつかのSIMD命令で並列化したbanded DPの実装と比較し、dynamic banded DPの特徴を明らかにする。
 
 
 # メソッド
@@ -511,21 +503,20 @@ blast X-drop DPやFarrarのアルゴリズムを置き換えることができ�
 
 # リファレンス
 
-1. Altschull, Stephen F., et al. "Basic local alignment search tool." J. Mol. Biol 215 (1990): 403-410.
-2. Smith, Temple F., and Michael S. Waterman. "Identification of common molecular subsequences." Journal of molecular biology 147.1 (1981): 195-197.
-3. Gotoh, Osamu. "An improved algorithm for matching biological sequences." Journal of molecular biology 162.3 (1982): 705-708.
-4. https://github.com/elucify/blast-docs/wiki/Gapped-Alignment-Phase "The Developer's Guide to BLAST: Gapped Alignment Phase"
-5. Chao, Kun-Mao, William R. Pearson, and Webb Miller. "Aligning two sequences within a specified diagonal band." Computer applications in the biosciences: CABIOS 8.5 (1992): 481-487.
-6. Döring, Andreas, et al. "SeqAn an efficient, generic C++ library for sequence analysis." BMC bioinformatics 9.1 (2008): 11.
-7. Zhao, Mengyao, et al. "SSW library: An SIMD smith-waterman C/C++ library for use in genomic applications." (2013): e82138.
-8. Lee, Wan-Ping, et al. "MOSAIK: a hash-based algorithm for accurate next-generation sequencing short-read mapping." PloS one 9.3 (2014): e90581.
-9. Li, Heng. "Aligning sequence reads, clone sequences and assembly contigs with BWA-MEM." arXiv preprint arXiv:1303.3997 (2013).
-10. Chaisson, Mark J., and Glenn Tesler. "Mapping single molecule sequencing reads using basic local alignment with successive refinement (BLASR): application and theory." BMC bioinformatics 13.1 (2012): 238.
-11. Wozniak, Andrzej. "Using video-oriented instructions to speed up sequence comparison." Computer applications in the biosciences: CABIOS 13.2 (1997): 145-150.
-12. Rognes, Torbjørn, and Erling Seeberg. "Six-fold speed-up of Smith–Waterman sequence database searches using parallel processing on common microprocessors." Bioinformatics 16.8 (2000): 699-706.
-13. Farrar, Michael. "Striped Smith–Waterman speeds database searches six times over other SIMD implementations." Bioinformatics 23.2 (2007): 156-161.
-14. Myers, Gene. "A fast bit-vector algorithm for approximate string matching based on dynamic programming." Journal of the ACM (JACM) 46.3 (1999): 395-415.
-15. Kimura, Kouichi, Asako Koike, and Kenta Nakai. "A bit-parallel dynamic programming algorithm suitable for DNA sequence alignment." Journal of bioinformatics and computational biology 10.04 (2012): 1250002.
-16. Li, Heng, and Richard Durbin. "Fast and accurate long-read alignment with Burrows–Wheeler transform." Bioinformatics 26.5 (2010): 589-595.
-17. Langmead, Ben, and Steven L. Salzberg. "Fast gapped-read alignment with Bowtie 2." Nature methods 9.4 (2012): 357-359.
+1. Li, Heng, and Nils Homer. "A survey of sequence alignment algorithms for next-generation sequencing." Briefings in bioinformatics 11.5 (2010): 473-483.
+2. Altschull, Stephen F., et al. "Basic local alignment search tool." J. Mol. Biol 215 (1990): 403-410.
+3. Smith, Temple F., and Michael S. Waterman. "Identification of common molecular subsequences." Journal of molecular biology 147.1 (1981): 195-197.
+4. Gotoh, Osamu. "An improved algorithm for matching biological sequences." Journal of molecular biology 162.3 (1982): 705-708.
+5. https://github.com/elucify/blast-docs/wiki/Gapped-Alignment-Phase "The Developer's Guide to BLAST: Gapped Alignment Phase"
+6. Chao, Kun-Mao, William R. Pearson, and Webb Miller. "Aligning two sequences within a specified diagonal band." Computer applications in the biosciences: CABIOS 8.5 (1992): 481-487.
+7. Döring, Andreas, et al. "SeqAn an efficient, generic C++ library for sequence analysis." BMC bioinformatics 9.1 (2008): 11.
+8. Zhao, Mengyao, et al. "SSW library: An SIMD smith-waterman C/C++ library for use in genomic applications." (2013): e82138.
+9. Lee, Wan-Ping, et al. "MOSAIK: a hash-based algorithm for accurate next-generation sequencing short-read mapping." PloS one 9.3 (2014): e90581.
+10. Li, Heng. "Aligning sequence reads, clone sequences and assembly contigs with BWA-MEM." arXiv preprint arXiv:1303.3997 (2013).
+11. Chaisson, Mark J., and Glenn Tesler. "Mapping single molecule sequencing reads using basic local alignment with successive refinement (BLASR): application and theory." BMC bioinformatics 13.1 (2012): 238.
+12. Wozniak, Andrzej. "Using video-oriented instructions to speed up sequence comparison." Computer applications in the biosciences: CABIOS 13.2 (1997): 145-150.
+13. Rognes, Torbjørn, and Erling Seeberg. "Six-fold speed-up of Smith–Waterman sequence database searches using parallel processing on common microprocessors." Bioinformatics 16.8 (2000): 699-706.
+14. Farrar, Michael. "Striped Smith–Waterman speeds database searches six times over other SIMD implementations." Bioinformatics 23.2 (2007): 156-161.
+15. Li, Heng, and Richard Durbin. "Fast and accurate long-read alignment with Burrows–Wheeler transform." Bioinformatics 26.5 (2010): 589-595.
+16. Langmead, Ben, and Steven L. Salzberg. "Fast gapped-read alignment with Bowtie 2." Nature methods 9.4 (2012): 357-359.
 
