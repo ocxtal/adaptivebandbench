@@ -123,11 +123,11 @@ sw_result_t sw_affine(
 	mat[a(0, 0)] = mat[f(0, 0)] = mat[e(0, 0)] = 0;
 	for(uint64_t i = 1; i < alen+1; i++) {
 		mat[a(i, 0)] = mat[f(i, 0)] = MAX2(min, gi + (i - 1) * ge);
-		mat[e(i, 0)] = MAX2(min, gi + (i - 1) * ge + gi - ge);
+		mat[e(i, 0)] = MAX2(min, gi + (i - 1) * ge + gi - ge - 1);
 	}
 	for(uint64_t j = 1; j < blen+1; j++) {
 		mat[a(0, j)] = mat[e(0, j)] = MAX2(min, gi + (j - 1) * ge);
-		mat[f(0, j)] = MAX2(min, gi + (j - 1) * ge + gi - ge);
+		mat[f(0, j)] = MAX2(min, gi + (j - 1) * ge + gi - ge - 1);
 	}
 
 	for(uint64_t j = 1; j < blen+1; j++) {
