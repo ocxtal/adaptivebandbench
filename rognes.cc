@@ -255,10 +255,19 @@ rognes_affine(
 #include <stdlib.h>
 int main_ext(int argc, char *argv[])
 {
+	uint64_t alen = strlen(argv[2]);
+	uint64_t blen = strlen(argv[3]);
+	char *a = (char *)malloc(alen + vec::LEN + 1);
+	char *b = (char *)malloc(blen + vec::LEN + 1);
+
+	memcpy(a, argv[2], alen);
+	memset(a + alen, 0, vec::LEN + 1);
+	memcpy(b, argv[3], blen);
+	memset(b + blen, 0x80, vec::LEN + 1);
+
 	if(strcmp(argv[1], "linear") == 0) {
 		int score = rognes_linear(
-			argv[2], strlen(argv[2]),
-			argv[3], strlen(argv[3]),
+			a, alen, b, blen,
 			atoi(argv[4]),
 			atoi(argv[5]),
 			atoi(argv[6]),
@@ -267,8 +276,7 @@ int main_ext(int argc, char *argv[])
 		printf("%d\n", score);
 	} else if(strcmp(argv[1], "affine") == 0) {
 		int score = rognes_affine(
-			argv[2], strlen(argv[2]),
-			argv[3], strlen(argv[3]),
+			a, alen, b, blen,
 			atoi(argv[4]),
 			atoi(argv[5]),
 			atoi(argv[6]),
@@ -278,6 +286,8 @@ int main_ext(int argc, char *argv[])
 	} else {
 		printf("./a.out linear AAA AAA 2 -3 -5 -1 30\n");
 	}
+
+	free(a); free(b);
 	return(0);
 }
 
