@@ -213,10 +213,14 @@ blast_affine(
 #include <stdlib.h>
 int main_ext(int argc, char *argv[])
 {
+	uint64_t alen = strlen(argv[2]);
+	uint64_t blen = strlen(argv[3]);
+	char *a = argv[2];
+	char *b = argv[3];
+
 	if(strcmp(argv[1], "linear") == 0) {
 		int score = blast_linear(
-			argv[2], strlen(argv[2]),
-			argv[3], strlen(argv[3]),
+			a, alen, b, blen,
 			atoi(argv[4]),
 			atoi(argv[5]),
 			atoi(argv[6]),
@@ -225,8 +229,7 @@ int main_ext(int argc, char *argv[])
 		printf("%d\n", score);
 	} else if(strcmp(argv[1], "affine") == 0) {
 		int score = blast_affine(
-			argv[2], strlen(argv[2]),
-			argv[3], strlen(argv[3]),
+			a, alen, b, blen,
 			atoi(argv[4]),
 			atoi(argv[5]),
 			atoi(argv[6]),
