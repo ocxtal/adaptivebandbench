@@ -5,7 +5,7 @@
 pbsim_path = '/home/suzukihajime/src/pbsim-1.0.3/src/'
 ref_path = '/home/suzukihajime/oni/work/resource/NC_000913.fna'
 ref_length = 4700000
-bin_path = '../bin'
+bin_path = '/home/suzukihajime/src/rognes/bin'
 count = 1000
 hist_size = 100
 
