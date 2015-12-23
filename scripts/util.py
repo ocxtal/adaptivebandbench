@@ -69,8 +69,8 @@ def generate_params(params_list, count):
 def randbase():
 	return(['A', 'C', 'G', 'T'][random.randint(0, 3)])
 
-def default_modifier(seq, param):
-	return(seq + ''.join([randbase() for i in range(100)]))
+def default_modifier(seq, param, length = 100):
+	return(seq + ''.join([randbase() for i in range(length)]))
 
 def evaluate_impl(pbsim_path, ref_path, bin_path,
 	gi, x, bandwidth, error_rate, length, count,
