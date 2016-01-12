@@ -3,6 +3,10 @@
 
 from util import *
 
+pbsim_path = '/Users/suzukihajime/docs/src/dl/pbsim-1.0.3/src/'
+ref_path = '/Users/suzukihajime/docs/lab/oni/work/NC_000913.fna'
+bin_path = '../bin'
+
 # utility
 def num(s):
 	try: return int(s)
@@ -24,10 +28,6 @@ def parse_and_run(input_file, output_file, evaluate_function):
 if __name__ == '__main__':
 
 	import sys
-
-	# pbsim_path = '/Users/suzukihajime/docs/src/dl/pbsim-1.0.3/src/'
-	# ref_path = '/Users/suzukihajime/docs/lab/oni/work/NC_000913.fna'
-	# bin_path = '..'
 
 	parse_and_run(sys.argv[1], sys.argv[2], evaluate)
 

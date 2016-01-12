@@ -84,14 +84,16 @@ def evaluate_impl(pbsim_path, ref_path, bin_path,
 		error_rate)
 	pairs = parse_maf('./{0}_0001.maf'.format(prefix))
 
-	results_linear = []
-	results_affine = []
+	# results_linear = []
+	# results_affine = []
+	results = []
 	tot = 0
 	for pair in pairs:
 
 		ref = modifier(pair[0], param1)
 		read = modifier(pair[1], param2)
 
+		"""
 		results_linear.append(align(
 			['{0}/full-{1}'.format(bin_path, bandwidth),
 			 '{0}/blast-{1}'.format(bin_path, bandwidth),
@@ -107,13 +109,22 @@ def evaluate_impl(pbsim_path, ref_path, bin_path,
 			'affine', ref, read,
 			2, x, gi, -2,		# m, x, gi, ge
 			max(param1, param2)))
-		
+		"""
+
+		results.append(align(
+			['{0}/full-{1}'.format(bin_path, bandwidth),
+			 '{0}/blast-{1}'.format(bin_path, bandwidth),
+			 '{0}/ddiag-{1}'.format(bin_path, bandwidth)],
+			'affine', ref, read,
+			2, x, gi, -2,		# m, x, gi, ge
+			max(param1, param2)))
 		tot = tot + 1
 		if tot == count:
 			break
 	
 	cleanup_pbsim(prefix)
-	return([results_linear, results_affine])
+	# return([results_linear, results_affine])
+	return(results)
 
 def evaluate(pbsim_path, ref_path, bin_path, gi, x, bandwidth, error_rate, length, count):
 	return(evaluate_impl(pbsim_path, ref_path, bin_path,
@@ -177,43 +188,51 @@ def slice_array(arr, indices):
 	else:
 		return(slice_array_intl(arr, indices, slice_array))
 
-def aggregate(input_file, output_file, params_list):
+def default_aggregator(r):
+	return([score_identity(r, [0, 1]), score_identity(r, [0, 2])])
+
+def aggregate(input_file, output_file, params_list = params_list, aggregator = default_aggregator):
 
 	dimensions = [len(p) for p in params_list]
-	results_linear = array(dimensions)
-	results_affine = array(dimensions)
+	# results_linear = array(dimensions)
+	# results_affine = array(dimensions)
+	results = array(dimensions)
 
 	import sys
 
-	lines = []
-	with open(input_file) as r: lines = r.readlines()
+	with open(input_file) as r:
 
-	for line in lines:
-		p = [eval(s) for s in line.split('\t')]
-		# print(p)
-		indices = [l.index(q) for (l, q) in zip(params_list, p)]
-		# print(indices)
+		for line in r.readline():
+			p = [eval(s) for s in line.split('\t')]
+			# print(p)
+			indices = [l.index(q) for (l, q) in zip(params_list, p)]
+			# print(indices)
 
-		r = p[len(params_list) + 1:]
+			r = p[len(params_list) + 1:]
 
-		set_array(results_linear, indices, r[0])
-		set_array(results_affine, indices, r[1])
+			# set_array(results_linear, indices, r[0])
+			# set_array(results_affine, indices, r[1])
+			set_array(results, aggregator(r))
 
 	with open(output_file, "w") as w:
-		w.write(str(results_linear) + '\n')
-		w.write(str(results_affine) + '\n')
+		# w.write(str(results_linear) + '\n')
+		# w.write(str(results_affine) + '\n')
+		w.write(str(results) + '\n')
 
 def load_result_impl(filename):
 
 	# from numpy import array
 
-	linear = []
-	affine = []
+	# linear = []
+	# affine = []
+	result = []
 	with open(filename) as f:
-		linear = eval(f.readline())
-		affine = eval(f.readline())
+		# linear = eval(f.readline())
+		# affine = eval(f.readline())
+		result = eval(f.readline())
 
-	return(linear, affine)
+	# return(linear, affine)
+	return(result)
 
 def load_result(filename):
 	return(load_result_impl(filename))
