@@ -3,9 +3,9 @@
 
 from util import *
 
-pbsim_path = '/Users/suzukihajime/docs/src/dl/pbsim-1.0.3/src/'
-ref_path = '/Users/suzukihajime/docs/lab/oni/work/NC_000913.fna'
-bin_path = '../bin'
+# pbsim_path = '/Users/suzukihajime/docs/src/dl/pbsim-1.0.3/src/'
+# ref_path = '/Users/suzukihajime/docs/lab/oni/work/NC_000913.fna'
+# bin_path = '../bin'
 
 # utility
 def num(s):
