@@ -22,6 +22,11 @@ def evaluate_gap(pbsim_path, ref_path, bin_path,
 	x = -4
 	gi = -4
 	# ge = -2
+
+	# exchange ref gap length and read gap length
+	if random.randint(0, 1) == 1:
+		(ref_gap_length, read_gap_length) = (read_gap_length, ref_gap_length)
+
 	return(evaluate_impl(pbsim_path, ref_path, bin_path,
 		gi, x, bandwidth, error_rate, length, count,
 		gap_insert_modifier, ref_gap_length, read_gap_length))

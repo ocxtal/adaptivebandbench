@@ -7,5 +7,5 @@ if __name__ == '__main__':
 
 	import sys
 
-	aggregate(sys.argv[1], sys.argv[2], params_list_gap)
+	aggregate(sys.argv[1], sys.argv[2], params_list = params_list_gap)
 

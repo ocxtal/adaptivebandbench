@@ -189,34 +189,36 @@ def slice_array(arr, indices):
 		return(slice_array_intl(arr, indices, slice_array))
 
 def default_aggregator(r):
-	return([score_identity(r, [0, 1]), score_identity(r, [0, 2])])
+	return(score_identity(r, comp_pair = [0, 2]))
 
 def aggregate(input_file, output_file, params_list = params_list, aggregator = default_aggregator):
+	with open(input_file, "r") as r, open(output_file, "w") as w:
+
+		line = r.readline()
+		while line:
+			p = map(eval, line.split('\t'))
+			w.write('\t'.join(map(str, p[:len(params_list)] + [aggregator(p[len(params_list)])])) + '\n')
+			line = r.readline()
+
+
+def make_table(input_file, output_file, params_list = params_list):
 
 	dimensions = [len(p) for p in params_list]
-	# results_linear = array(dimensions)
-	# results_affine = array(dimensions)
 	results = array(dimensions)
 
 	import sys
 
 	with open(input_file) as r:
 
-		for line in r.readline():
-			p = [eval(s) for s in line.split('\t')]
-			# print(p)
+		line = r.readline()
+		while line:
+			p = map(eval, line.split('\t'))
 			indices = [l.index(q) for (l, q) in zip(params_list, p)]
-			# print(indices)
-
-			r = p[len(params_list) + 1:]
-
-			# set_array(results_linear, indices, r[0])
-			# set_array(results_affine, indices, r[1])
-			set_array(results, aggregator(r))
+			result = p[len(params_list)]
+			set_array(results, indices, result)
+			line = r.readline()
 
 	with open(output_file, "w") as w:
-		# w.write(str(results_linear) + '\n')
-		# w.write(str(results_affine) + '\n')
 		w.write(str(results) + '\n')
 
 def load_result_impl(filename):
