@@ -22,7 +22,7 @@ def parse_and_run(input_file, output_file, evaluate_function):
 			p = [num(s) for s in line.split()]
 			# print(p)
 			res = evaluate_function(pbsim_path, ref_path, bin_path, *p)
-			w.write('{}\n'.format('\t'.join([str(r) for r in p+res])))
+			w.write('{}\n'.format('\t'.join([str(r) for r in p[:len(p)-1] + [res]])))
 
 
 if __name__ == '__main__':

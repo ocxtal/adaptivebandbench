@@ -84,32 +84,12 @@ def evaluate_impl(pbsim_path, ref_path, bin_path,
 		error_rate)
 	pairs = parse_maf('./{0}_0001.maf'.format(prefix))
 
-	# results_linear = []
-	# results_affine = []
 	results = []
 	tot = 0
 	for pair in pairs:
 
 		ref = modifier(pair[0], param1)
 		read = modifier(pair[1], param2)
-
-		"""
-		results_linear.append(align(
-			['{0}/full-{1}'.format(bin_path, bandwidth),
-			 '{0}/blast-{1}'.format(bin_path, bandwidth),
-			 '{0}/ddiag-{1}'.format(bin_path, bandwidth)],
-			'linear', ref, read,
-			2, x, gi, -2,		# m, x, gi, ge
-			max(param1, param2)))
-
-		results_affine.append(align(
-			['{0}/full-{1}'.format(bin_path, bandwidth),
-			 '{0}/blast-{1}'.format(bin_path, bandwidth),
-			 '{0}/ddiag-{1}'.format(bin_path, bandwidth)],
-			'affine', ref, read,
-			2, x, gi, -2,		# m, x, gi, ge
-			max(param1, param2)))
-		"""
 
 		results.append(align(
 			['{0}/full-{1}'.format(bin_path, bandwidth),
@@ -123,7 +103,39 @@ def evaluate_impl(pbsim_path, ref_path, bin_path,
 			break
 	
 	cleanup_pbsim(prefix)
-	# return([results_linear, results_affine])
+	return(results)
+
+def evaluate_impl2(pbsim_path, ref_path, bin_path,
+	x, gi, ge, bandwidth, error_rate, length, count,
+	modifier, param1, param2):
+
+	prefix = 's_{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}'.format(
+		-x, -gi, -ge, bandwidth, error_rate, length, param1, param2)
+	pbsim(pbsim_path, ref_path, prefix,
+		length,
+		1.2 * count * length / ref_length,		# depth
+		error_rate)
+	pairs = parse_maf('./{0}_0001.maf'.format(prefix))
+
+	results = []
+	tot = 0
+	for pair in pairs:
+
+		ref = modifier(pair[0], param1)
+		read = modifier(pair[1], param2)
+
+		results.append(align(
+			['{0}/full-{1}'.format(bin_path, bandwidth),
+			 '{0}/blast-{1}'.format(bin_path, bandwidth),
+			 '{0}/ddiag-{1}'.format(bin_path, bandwidth)],
+			'affine', ref, read,
+			2, x, gi + ge, ge,		# m, x, gi, ge
+			max(param1, param2)))
+		tot = tot + 1
+		if tot == count:
+			break
+	
+	cleanup_pbsim(prefix)
 	return(results)
 
 def evaluate(pbsim_path, ref_path, bin_path, gi, x, bandwidth, error_rate, length, count):
@@ -191,6 +203,9 @@ def slice_array(arr, indices):
 def default_aggregator(r):
 	return(score_identity(r, comp_pair = [0, 2]))
 
+def hist_aggregator(r):
+	return(score_hist(r, bin_size = 30, comp_pair = [0, 2]))
+
 def aggregate(input_file, output_file, params_list = params_list, aggregator = default_aggregator):
 	with open(input_file, "r") as r, open(output_file, "w") as w:
 
@@ -254,10 +269,12 @@ def score_identity(elems, comp_pair = [0, 1]):
 	try: return(sum([elem[comp_pair[0]][0] == elem[comp_pair[1]][0] for elem in elems]))
 	except TypeError: return('-')
 
-def score_difference(elems, bin_size = 30, comp_pair = [0, 1]):
+def score_hist(elems, bin_size = 30, comp_pair = [0, 1]):
 	bin = [0 for i in range(bin_size)]
 	try:
 		for elem in elems:
+			if elem[comp_pair[0]][0] < elem[comp_pair[1]][0]:
+				print(elem)
 			bin[clip(elem[comp_pair[0]][0] - elem[comp_pair[1]][0] + bin_size/2, 0, bin_size-1)] += 1
 		return([str(e) for e in bin])
 	except TypeError: return([str(e) for e in bin])

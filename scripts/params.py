@@ -31,3 +31,9 @@ read_gaps = [0]
 bandwidths_gap = bandwidths # [8, 16, 24, 32, 40, 48, 56, 64]
 params_list_gap = [ref_gaps, read_gaps, bandwidths_gap, error_rates, [1000, 10000]]
 
+# gi-ge evaluation
+gis = [-i for i in range(0, 6)]
+ges = [-i for i in range(0, 6)]
+params_list_gige = [gis, ges, [32], [0.75], [1000]]
+
+
