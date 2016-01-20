@@ -20,7 +20,7 @@ dashes = [
 linewidth = 1.5
 fontsize = 20
 
-def dump_headmap_data(in_list, first_label, first_legend, second_label, second_legend, out_file, count = count):
+def dump_heatmap_data(in_list, first_label, first_legend, second_label, second_legend, out_file, count = count):
 
 	with open(out_file, "w") as o:
 
@@ -34,29 +34,32 @@ result_affine_2_x_y_1 = np.array(load_result('../results/affine_2_x_y_1_ddiag_ta
 result_affine_2_x_y_2 = np.array(load_result('../results/affine_2_x_y_2_ddiag_table.txt'))
 result_affine_2_x_y_3 = np.array(load_result('../results/affine_2_x_y_3_ddiag_table.txt'))
 
-# plot bw-id
-dump_headmap_data(result_affine_2_x_y_2[2, 2, :, :, 3].transpose(), 'Identity', error_rates, 'BW', bandwidths, 'bw_id.txt')
+# fix x
+xs_fixed = [-x for x in xs]
 
-# plot id-len
-dump_headmap_data(result_affine_2_x_y_2[2, 2, 1, :, :], 'Identity', error_rates, 'Length', lengths, 'id_len_16.txt')
-
-# plot id-len
-dump_headmap_data(result_affine_2_x_y_2[2, 2, 3, :, :], 'Identity', error_rates, 'Length', lengths, 'id_len_32.txt')
-
-# plot x-gi
-xs_neg = [-x for x in xs]
-gs_neg = [-x for x in gs]
-gs_ofs = [x - 2 for x in gs_neg]
-
-# fix result table:
+# fix gi
 # convert gap penalty model
 # from g(k) = g_i + (k - 1) g_e
 # to   g(k) = g_i + k g_e
-result_2_x_y_1 = result_linear_2_x_y_2[0, :, 3, 4, 3] + 
-dump_headmap_data(result_linear_2_x_y_2[:, :, 3, 4, 3], 'Ge', gs, 'X', xs, 'x_ge_linear_2_x_y_2.txt')
-dump_headmap_data(result_affine_2_x_y_1[:, 0:gs_len-2, 3, 4, 3], 'Gi', gs_fixed, 'X', xs, 'x_gi_affine_2_x_y_1.txt')
-dump_headmap_data(result_affine_2_x_y_2[:, 1:gs_len-1, 3, 4, 3], 'Gi', gs_fixed, 'X', xs, 'x_gi_affine_2_x_y_2.txt')
-dump_headmap_data(result_affine_2_x_y_3[:, 2:gs_len, 3, 4, 3], 'Gi', gs_fixed, 'X', xs, 'x_gi_affine_2_x_y_3.txt')
+gs_fixed_linear_2_x_y_2 = [-x for x in gs]
+gs_fixed_affine_2_x_y_1 = [-x - 1 for x in gs]
+gs_fixed_affine_2_x_y_2 = [-x - 2 for x in gs]
+gs_fixed_affine_2_x_y_3 = [-x - 3 for x in gs]
+
+# plot bw-id
+dump_heatmap_data(result_affine_2_x_y_2[2, 2, :, :, 3].transpose(), 'Identity', error_rates, 'BW', bandwidths, 'bw_id.txt')
+
+# plot id-len
+dump_heatmap_data(result_affine_2_x_y_2[2, 2, 1, :, :], 'Identity', error_rates, 'Length', lengths, 'id_len_16.txt')
+
+# plot id-len
+dump_heatmap_data(result_affine_2_x_y_2[2, 2, 3, :, :], 'Identity', error_rates, 'Length', lengths, 'id_len_32.txt')
+
+# plot x-gi
+dump_heatmap_data(result_linear_2_x_y_2[:, :, 3, 4, 3], 'Ge', gs_fixed_linear_2_x_y_2, 'X', xs_fixed, 'x_ge_linear_2_x_y_2.txt')
+dump_heatmap_data(result_affine_2_x_y_1[0:len(gs)-2, :, 3, 4, 3], 'Gi', gs_fixed_affine_2_x_y_1, 'X', xs_fixed, 'x_gi_affine_2_x_y_1.txt')
+dump_heatmap_data(result_affine_2_x_y_2[1:len(gs)-1, :, 3, 4, 3], 'Gi', gs_fixed_affine_2_x_y_2, 'X', xs_fixed, 'x_gi_affine_2_x_y_2.txt')
+dump_heatmap_data(result_affine_2_x_y_3[2:len(gs), :, 3, 4, 3], 'Gi', gs_fixed_affine_2_x_y_3, 'X', xs_fixed, 'x_gi_affine_2_x_y_3.txt')
 
 def plot_gap_bench(in_file, out_file):
 	# clear figure
