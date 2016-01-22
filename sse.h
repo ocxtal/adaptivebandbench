@@ -70,7 +70,7 @@ public:
 		#define c(n) case n: return(char_vec(v<<(8*(n))));
 			l(0);
 		#undef c
-			default: return(char_vec(0ULL));
+			default: return(char_vec((uint64_t)0));
 		#undef l
 		}
 	}
@@ -81,7 +81,7 @@ public:
 		#define c(n) case n: return(char_vec(v>>(8*(n))));
 			l(0);
 		#undef c
-			default: return(char_vec(0ULL));
+			default: return(char_vec((uint64_t)0));
 		#undef l
 		}
 	}
