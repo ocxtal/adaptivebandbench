@@ -112,7 +112,8 @@ def read_csv(filename):
 
 def plot_calc_time(in_file, out_file):
 	
-	variants = ['bm-st (32)', 'blast', 'simdblast', 'st (32)', 'dyn (32)', 'ssw']
+	lengths = [100, 150, 250, 350, 500, 650, 800, 1000, 1500, 2500, 3500, 5000, 6500, 8000, 10000]
+	variants = ['bm-sband (32)', 'blast', 'simdblast', 'sband (32)', 'dband (32)', 'ssw']
 
 	# clear figure
 	plt.clf()
@@ -139,7 +140,7 @@ def plot_calc_time(in_file, out_file):
 	plt.ylabel('Calc. time (us)', fontsize = fontsize)
 	plt.yscale('log')
 
-	plt.title('Gap insert size - recall rate', fontsize = fontsize)
+	plt.title('Calc. time - Sequence length', fontsize = fontsize)
 	plt.legend(title = 'BW', loc = 'best', fontsize = fontsize * 0.6)
 
 	plt.savefig(out_file, dpi = 72)

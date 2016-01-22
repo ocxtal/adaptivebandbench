@@ -1,3 +1,3 @@
 #! /usr/bin/env bash
 
-for l in 100 200 500 1000 2000 5000 10000; do ../bench -a $l $1; done
+for l in 100 150 250 350 500 650 800 1000 1500 2500 3500 5000 6500 8000 10000; do ../bench -a $l $1; done
