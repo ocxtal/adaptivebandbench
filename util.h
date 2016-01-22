@@ -14,11 +14,88 @@
 #include <stdint.h>				/** uint32_t, uint64_t, ... */
 #include <stddef.h>				/** offsetof */
 #include <string.h>				/** memset, memcpy */
+#include <smmintrin.h>
 
 /**
  * aligned malloc
  */
-void *aligned_malloc(size_t size, size_t align);
+static inline
+void *aligned_malloc(
+	size_t size,
+	size_t align)
+{
+	void *ptr = NULL;
+	posix_memalign(&ptr, align, size);
+	debug("posix_memalign(%p)", ptr);
+	return(ptr);
+}
+
+/**
+ * misc
+ */
+static inline
+int8_t encode(char a)
+{
+	return(0x03 & ((a>>1) ^ (a>>2)));
+}
+
+static inline
+int8_t encode_a(char a)
+{
+	return(0x03 & ((a>>1) ^ (a>>2)));
+}
+
+static inline
+int8_t encode_b(char b)
+{
+	return(0x0c & ((b<<1) ^ b));
+}
+
+static inline
+void build_score_matrix(int8_t *matrix, int8_t m, int8_t x)
+{
+	int i = 0;
+	matrix[i++] = m;	// (A, A)
+	matrix[i++] = x;	// (C, A)
+	matrix[i++] = x;	// (G, A)
+	matrix[i++] = x;	// (T, A)
+	matrix[i++] = x;	// (A, C)
+	matrix[i++] = m;	// (C, C)
+	matrix[i++] = x;	// (G, C)
+	matrix[i++] = x;	// (T, C)
+	matrix[i++] = x;	// (A, G)
+	matrix[i++] = x;	// (C, G)
+	matrix[i++] = m;	// (G, G)
+	matrix[i++] = x;	// (T, G)
+	matrix[i++] = x;	// (A, T)
+	matrix[i++] = x;	// (C, T)
+	matrix[i++] = x;	// (G, T)
+	matrix[i++] = m;	// (T, T)
+	return;
+}
+
+static inline
+int8_t extract_max_score(int8_t *matrix)
+{
+	__m128i a = _mm_load_si128((__m128i *)matrix);
+	a = _mm_max_epi8(a, _mm_srli_si128(a, 1));
+	a = _mm_max_epi8(a, _mm_srli_si128(a, 2));
+	a = _mm_max_epi8(a, _mm_srli_si128(a, 4));
+	a = _mm_max_epi8(a, _mm_srli_si128(a, 8));
+	return(_mm_extract_epi8(a, 0));
+}
+
+static inline
+int8_t extract_min_score(int8_t *matrix)
+{
+	__m128i a = _mm_load_si128((__m128i *)matrix);
+	a = _mm_min_epi8(a, _mm_srli_si128(a, 1));
+	a = _mm_min_epi8(a, _mm_srli_si128(a, 2));
+	a = _mm_min_epi8(a, _mm_srli_si128(a, 4));
+	a = _mm_min_epi8(a, _mm_srli_si128(a, 8));
+	return(_mm_extract_epi8(a, 0));
+}
+
 
 /**
  * @macro popcnt

@@ -5,15 +5,13 @@
  * @brief full Smith-Waterman
  */
 #include "full.h"
+#include "util.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 
 #define _a(p, q, plen)		( (q) * ((plen) + 1) + (p) )
-#define MAX2(p, q)			( ((p) < (q)) ? (q) : (p) )
-#define MAX3(p, q, r)		( MAX2(p, MAX2(q, r)) )
-#define MAX4(p, q, r, s)	( MAX2(MAX2(p, q), MAX2(r, s)) )
 
 typedef struct _maxpos {
 	int16_t score;
@@ -29,13 +27,15 @@ sw_result_t sw_linear(
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
-	int8_t m, int8_t x, int8_t gi, int8_t ge)
+	int8_t *score_matrix, int8_t ge)
+	// int8_t m, int8_t x, int8_t gi, int8_t ge)
 {
 	/* util macros */
 	#define a(p, q)		_a(p, q, alen)
-	#define s(p, q)		( (a[(p) - 1] == b[(q) - 1]) ? m : x )
+	// #define s(p, q)		( (a[(p) - 1] == b[(q) - 1]) ? m : x )
+	#define s(p, q)		( score_matrix[encode_a(a[(p) - 1]) | encode_b(b[(q) - 1])] )
 
-	int16_t const min = INT16_MIN - x - gi;
+	int16_t const min = INT16_MIN - extract_min_score(score_matrix) - ge;
 
 	int16_t *mat = (int16_t *)malloc(
 		(alen + 1) * (blen + 1) * sizeof(int16_t));
@@ -43,15 +43,15 @@ sw_result_t sw_linear(
 	/* init */
 	maxpos_t max = { 0, 0, 0 };
 	mat[a(0, 0)] = 0;
-	for(uint64_t i = 1; i < alen+1; i++) { mat[a(i, 0)] = MAX2(min, i * gi); }
-	for(uint64_t j = 1; j < blen+1; j++) { mat[a(0, j)] = MAX2(min, j * gi); }
+	for(uint64_t i = 1; i < alen+1; i++) { mat[a(i, 0)] = MAX2(min, i * ge); }
+	for(uint64_t j = 1; j < blen+1; j++) { mat[a(0, j)] = MAX2(min, j * ge); }
 
 	for(uint64_t j = 1; j < blen+1; j++) {
 		for(uint64_t i = 1; i < alen+1; i++) {
 			int16_t score = mat[a(i, j)] = MAX4(min,
 				mat[a(i - 1, j - 1)] + s(i, j),
-				mat[a(i, j - 1)] + gi,
-				mat[a(i - 1, j)] + gi);
+				mat[a(i, j - 1)] + ge,
+				mat[a(i - 1, j)] + ge);
 			if(score >= max.score) { max = (maxpos_t){ score, i, j }; }
 		}
 	}
@@ -66,15 +66,16 @@ sw_result_t sw_linear(
 		.path = (char *)malloc(max.apos + max.bpos + 1)
 	};
 	uint32_t path_index = max.apos + max.bpos + 1;
-	while(max.apos != 0 && max.bpos != 0) {
-		if(mat[a(max.apos, max.bpos)] == mat[a(max.apos, max.bpos - 1)] + gi) {
+	while(max.apos != 0 || max.bpos != 0) {
+		if(mat[a(max.apos, max.bpos)] == mat[a(max.apos, max.bpos - 1)] + ge) {
 			max.bpos--;
 			result.path[--path_index] = 'I';
-		} else if(mat[a(max.apos, max.bpos)] == mat[a(max.apos - 1, max.bpos)] + gi) {
+		} else if(mat[a(max.apos, max.bpos)] == mat[a(max.apos - 1, max.bpos)] + ge) {
 			max.apos--;
 			result.path[--path_index] = 'D';
 		} else {
-			if(mat[a(max.apos, max.bpos)] == mat[a(max.apos - 1, max.bpos - 1)] + x) {
+			// if(mat[a(max.apos, max.bpos)] == mat[a(max.apos - 1, max.bpos - 1)] + x) {
+			if(a[max.apos - 1] != b[max.bpos - 1]) {
 				result.path[--path_index] = 'X';
 			} else {
 				result.path[--path_index] = 'M';
@@ -105,18 +106,23 @@ sw_result_t sw_affine(
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
-	int8_t m, int8_t x, int8_t gi, int8_t ge)
+	int8_t *score_matrix, int8_t gi, int8_t ge)
+	// int8_t m, int8_t x, int8_t gi, int8_t ge)
 {
 	/* utils */
 	#define a(p, q)		_a(p, 3*(q), alen)
 	#define f(p, q)		_a(p, 3*(q)+1, alen)
 	#define e(p, q)		_a(p, 3*(q)+2, alen)
-	#define s(p, q)		( (a[(p) - 1] == b[(q) - 1]) ? m : x )
+	// #define s(p, q)		( (a[(p) - 1] == b[(q) - 1]) ? m : x )
+	#define s(p, q)		( score_matrix[encode_a(a[(p) - 1]) | encode_b(b[(q) - 1])] )
 
-	int16_t const min = INT16_MIN - x - gi;
+	int16_t const min = INT16_MIN - extract_min_score(score_matrix) - gi;
 
 	int16_t *mat = (int16_t *)malloc(
 		3 * (alen + 1) * (blen + 1) * sizeof(int16_t));
+
+	/* fix gi */
+	gi += ge;
 
 	/* init */
 	maxpos_t max = { 0, 0, 0 };
@@ -155,7 +161,7 @@ sw_result_t sw_affine(
 		.path = (char *)malloc(max.apos + max.bpos + 1)
 	};
 	uint32_t path_index = max.apos + max.bpos + 1;
-	while(max.apos != 0 && max.bpos != 0) {
+	while(max.apos != 0 || max.bpos != 0) {
 		if(mat[a(max.apos, max.bpos)] == mat[e(max.apos, max.bpos)]) {
 			while(mat[e(max.apos, max.bpos)] == mat[e(max.apos, max.bpos - 1)] + ge) {
 				max.bpos--;
@@ -171,7 +177,8 @@ sw_result_t sw_affine(
 			max.apos--;
 			result.path[--path_index] = 'D';
 		} else {
-			if(mat[a(max.apos, max.bpos)] == mat[a(max.apos - 1, max.bpos - 1)] + x) {
+			// if(mat[a(max.apos, max.bpos)] == mat[a(max.apos - 1, max.bpos - 1)] + x) {
+			if(a[max.apos - 1] != b[max.bpos - 1]) {
 				result.path[--path_index] = 'X';
 			} else {
 				result.path[--path_index] = 'M';
@@ -199,9 +206,8 @@ sw_result_t sw_affine(
 #ifdef TEST
 #include <stdio.h>
 #include <assert.h>
-#define _f(f, a, b, s)		f(a, strlen(a), b, strlen(b), s[0], s[1], s[2], s[3])
-#define _linear(a, b, s)	_f(sw_linear, a, b, s)
-#define _affine(a, b, s)	_f(sw_affine, a, b, s)
+#define _linear(a, b, s)	sw_linear(a, strlen(a), b, strlen(b), score_matrix, s[3])
+#define _affine(a, b, s)	sw_affine(a, strlen(a), b, strlen(b), score_matrix, s[2], s[3])
 static int8_t const t[][5] = {
 	{1, -1, -1, -1},
 	{1, -1, -2, -1},
@@ -211,6 +217,9 @@ static int8_t const t[][5] = {
 
 void test_linear_1_1_1(void)
 {
+	int8_t score_matrix[16] __attribute__(( aligned(16) ));
+	build_score_matrix(score_matrix, t[0][0], t[0][1]);
+
 	#define l(s, ap, bp, aln, p, q) { \
 		sw_result_t r = _linear(p, q, t[0]); \
 		assert(r.score == (s)); \
@@ -225,15 +234,18 @@ void test_linear_1_1_1(void)
 	l( 1,  1,  1, "M", "A", "A");
 	l( 3,  3,  3, "MMM", "AAA", "AAA");
 	l( 0,  0,  0, "", "AAA", "TTT");
-	l( 3,  6,  9, "MMM", "GGGAAAGGG", "TTTTTTAAATTTTTT");
+	l( 3,  3,  3, "MMM", "AAAGGG", "AAATTTTTT");
 
-	l( 5, 10, 13, "MMMDMMM", "GGGAAACAAAGGG", "TTTTTTTAAAAAATTTTTTT");
-	l( 4, 11, 13, "MMMDDMMM", "GGGAAACCAAAGGG", "TTTTTTTAAAAAATTTTTTT");
+	l( 5,  7,  6, "MMMDMMM", "AAACAAAGGG", "AAAAAATTTTTTT");
+	l( 4,  8,  6, "MMMDDMMM", "AAACCAAAGGG", "AAAAAATTTTTTT");
 	#undef l
 }
 
 void test_affine_1_1_1(void)
 {
+	int8_t score_matrix[16] __attribute__(( aligned(16) ));
+	build_score_matrix(score_matrix, t[0][0], t[0][1]);
+
 	#define a(s, ap, bp, aln, p, q) { \
 		sw_result_t r = _affine(p, q, t[0]); \
 		assert(r.score == (s)); \
@@ -248,10 +260,10 @@ void test_affine_1_1_1(void)
 	a( 1,  1,  1, "M", "A", "A");
 	a( 3,  3,  3, "MMM", "AAA", "AAA");
 	a( 0,  0,  0, "", "AAA", "TTT");
-	a( 3,  6,  9, "MMM", "GGGAAAGGG", "TTTTTTAAATTTTTT");
+	a( 3,  3,  3, "MMM", "AAAGGG", "AAATTTTTT");
 
-	a( 4, 10, 13, "MMMDMMM", "GGGAAACAAAGGG", "TTTTTTTAAAAAATTTTTTT");
-	a( 3, 11, 13, "MMMDDMMM", "GGGAAACCAAAGGG", "TTTTTTTAAAAAATTTTTTT");
+	a( 5,  8,  7, "MMMDMMMM", "AAACACGTGGG", "AAAACGTTTTTTTT");
+	a( 4,  9,  7, "MMMDDMMMM", "AAACCACGTGGG", "AAAACGTTTTTTTT");
 	#undef a
 }
 
@@ -268,14 +280,15 @@ int main(void)
 #include <stdio.h>
 int main_ext(int argc, char *argv[])
 {
+	int8_t score_matrix[16] __attribute__(( aligned(16) ));
+	build_score_matrix(score_matrix, atoi(argv[4]), atoi(argv[5]));
+
 	if(strcmp(argv[1], "linear") == 0) {
 		sw_result_t result = sw_linear(
 			argv[2], strlen(argv[2]),
 			argv[3], strlen(argv[3]),
-			atoi(argv[4]),
-			atoi(argv[5]),
-			atoi(argv[6]),
-			atoi(argv[7]));
+			score_matrix,
+			atoi(argv[5]));
 		printf("%d\t%llu\t%llu\t%s\n",
 			result.score,
 			result.apos,
@@ -286,10 +299,9 @@ int main_ext(int argc, char *argv[])
 		sw_result_t result = sw_affine(
 			argv[2], strlen(argv[2]),
 			argv[3], strlen(argv[3]),
-			atoi(argv[4]),
+			score_matrix,
 			atoi(argv[5]),
-			atoi(argv[6]),
-			atoi(argv[7]));
+			atoi(argv[6]));
 		printf("%d\t%llu\t%llu\t%s\n",
 			result.score,
 			result.apos,
@@ -304,14 +316,17 @@ int main_ext(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
-	char const *a = "aabbcccccc";
+	char const *a = "aattcccccc";
 	char const *b = "aacccccc";
 	// char const *a = "abefpppbbqqqqghijkltttt";
 	// char const *b = "abcdefpppqqqqijklggtttt";
 
 	if(argc > 1) { return(main_ext(argc, argv)); }
 
-	sw_result_t sl = sw_linear(a, strlen(a), b, strlen(b), 2, -3, -5, -1);
+	int8_t score_matrix[16] __attribute__(( aligned(16) ));
+	build_score_matrix(score_matrix, 1, -1);
+
+	sw_result_t sl = sw_linear(a, strlen(a), b, strlen(b), score_matrix, -1);
 	printf("%d\t%llu\t%llu\t%s\n",
 		sl.score,
 		sl.apos,
@@ -319,7 +334,7 @@ int main(int argc, char *argv[])
 		sl.path);
 	free(sl.path);
 
-	sw_result_t sa = sw_affine(a, strlen(a), b, strlen(b), 2, -3, -5, -1);
+	sw_result_t sa = sw_affine(a, strlen(a), b, strlen(b), score_matrix, -1, -1);
 	printf("%d\t%llu\t%llu\t%s\n",
 		sa.score,
 		sa.apos,

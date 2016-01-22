@@ -34,6 +34,8 @@ result_affine_2_x_y_1 = np.array(load_result('../results/affine_2_x_y_1_ddiag_ta
 result_affine_2_x_y_2 = np.array(load_result('../results/affine_2_x_y_2_ddiag_table.txt'))
 result_affine_2_x_y_3 = np.array(load_result('../results/affine_2_x_y_3_ddiag_table.txt'))
 
+result_gige = np.array(load_result('../results/gige_id_ddiag_table.txt'))
+
 # fix x
 xs_fixed = [-x for x in xs]
 
@@ -60,6 +62,9 @@ dump_heatmap_data(result_linear_2_x_y_2[:, :, 3, 4, 3], 'Ge', gs_fixed_linear_2_
 dump_heatmap_data(result_affine_2_x_y_1[0:len(gs)-2, :, 3, 4, 3], 'Gi', gs_fixed_affine_2_x_y_1, 'X', xs_fixed, 'x_gi_affine_2_x_y_1.txt')
 dump_heatmap_data(result_affine_2_x_y_2[1:len(gs)-1, :, 3, 4, 3], 'Gi', gs_fixed_affine_2_x_y_2, 'X', xs_fixed, 'x_gi_affine_2_x_y_2.txt')
 dump_heatmap_data(result_affine_2_x_y_3[2:len(gs), :, 3, 4, 3], 'Gi', gs_fixed_affine_2_x_y_3, 'X', xs_fixed, 'x_gi_affine_2_x_y_3.txt')
+
+# plot gige
+dump_heatmap_data(result_gige[:, :, 0, 0, 0], 'Gi', map(abs, gis), 'Ge', map(abs, ges), 'gige_id_ddiag_extract.txt')
 
 def plot_gap_bench(in_file, out_file):
 	# clear figure

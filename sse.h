@@ -11,6 +11,132 @@
 #include <stdint.h>
 #include <stdio.h>
 
+
+/**
+ * @class char_vec
+ */
+class char_vec {
+
+private:
+	uint64_t v;
+
+public:
+	/* consts */
+	static int8_t const MAX = 127;
+	static int8_t const MIN = -128;
+	static uint64_t const SIZE = sizeof(uint64_t);
+	static uint64_t const LEN = sizeof(uint64_t);
+
+	/* constructors */
+	char_vec(void) {}
+	char_vec(int8_t k) {
+		set(k);
+	}
+	char_vec(uint64_t i) {
+		v = i;
+	}
+
+	/* setter */
+	inline void zero(void) {
+		v = 0;
+	}
+	inline void set(int8_t k) {
+		v = ((uint64_t)k<<8) | (uint64_t)k;
+		v = (v<<16) | v;
+		v = (v<<32) | v;
+	}
+
+	/* getter */
+	inline uint64_t const &get(void) const { return(v); }
+
+	/* assign */
+	inline char_vec operator=(char_vec const &b) {
+		return(char_vec(v = b.get()));
+	}
+
+	/* and */
+	inline char_vec operator&(char_vec const &b) const {
+		return(char_vec(v & b.get()));
+	}
+	/* or */
+	inline char_vec operator|(char_vec const &b) const {
+		return(char_vec(v | b.get()));
+	}
+	/* shift left */
+	inline char_vec operator<<(int s) const {
+		switch(s) {
+		#define l(n) c(n+1) c(n+2) c(n+3) c(n+4) c(n+5) c(n+6) c(n+7)
+			case 0: return(char_vec(v));
+		#define c(n) case n: return(char_vec(v<<(8*(n))));
+			l(0);
+		#undef c
+			default: return(char_vec(0ULL));
+		#undef l
+		}
+	}
+	inline char_vec operator>>(int s) const {
+		switch(s) {
+		#define l(n) c(n+1) c(n+2) c(n+3) c(n+4) c(n+5) c(n+6) c(n+7)
+			case 0: return(char_vec(v));
+		#define c(n) case n: return(char_vec(v>>(8*(n))));
+			l(0);
+		#undef c
+			default: return(char_vec(0ULL));
+		#undef l
+		}
+	}
+	/* double shift: (a<<7) | (b>>1) */
+	inline char_vec dsr(char_vec const &b) const {
+		return(char_vec((v<<56) | (b.get()>>8)));
+	}
+	/* double shift: (a<<1) | (b>>7) */
+	inline char_vec dsl(char_vec const &b) const {
+		return(char_vec((v<<8) | (b.get()>>56)));
+	}
+	/* binary assign */
+	inline char_vec operator&=(char_vec const &b) { return(operator=(operator&(b))); }
+	inline char_vec operator|=(char_vec const &b) { return(operator=(operator|(b))); }
+	inline char_vec operator<<=(int s) { return(operator=(operator<<(s))); }
+	inline char_vec operator>>=(int s) { return(operator=(operator>>(s))); }
+	/* array */
+	inline int8_t operator[](uint64_t i) const {
+		if(i < 8) {
+			return(operator>>(i).get() & 0xff);
+		} else {
+			return(0);
+		}
+	}
+	inline int8_t lsb(void) const { return(operator[](0)); }
+	inline int8_t center(void) const { return(operator[](4)); }
+	inline int8_t msb(void) const { return(operator[](7)); }
+	inline int8_t ins(int8_t k, uint64_t i) {
+		if(i < 8) {
+			v = (v & ~(0xff<<(8*i))) | (k<<(8*i));
+		} else {
+			return(0);
+		}
+		return(k);
+	}
+
+	/* load and store */
+	inline void load(void const *ptr) {
+		v = *((uint64_t *)ptr);
+	}
+	inline void loadu(void const *ptr) {
+		load(ptr);
+	}
+	inline void load_encode_a(void const *ptr) {
+		load(ptr);
+		v = 0x0303030303030303 & ((v>>1) ^ (v>>2));
+	}
+	inline void store(void *ptr) const {
+		*((uint64_t *)ptr) = v;
+	}
+	inline void storeu(void *ptr) const {
+		store(ptr);
+	}
+};
+
 /**
  * @class vec
  *
@@ -52,7 +178,6 @@ public:
 	inline vec operator=(vec const &b) {
 		return(vec(v = b.get()));
 	}
-	/* cast */
 
 	/* add */
 	inline vec operator+(vec const &b) const {
@@ -108,6 +233,14 @@ public:
 		#undef l
 		}
 	}
+	/* double shift: (a<<7) | (b>>1) */
+	inline vec dsr(vec const &b) const {
+		return(vec(_mm_alignr_epi8(v, b.get(), 2)));
+	}
+	/* double shift: (a<<1) | (b>>7) */
+	inline vec dsl(vec const &b) const {
+		return(vec(_mm_alignr_epi8(v, b.get(), 14)));
+	}
 	/* binary assign */
 	inline vec operator+=(vec const &b) { return(operator=(operator+(b))); }
 	inline vec operator-=(vec const &b) { return(operator=(operator-(b))); }
@@ -146,6 +279,10 @@ public:
 	}
 	inline vec select(vec const &m, vec const &x) const {
 		return(vec(_mm_blendv_epi8(x.get(), m.get(), v)));
+	}
+	inline vec shuffle(char_vec const &a) {
+		__m128i index = _mm_cvtsi64_si128(a.get());
+		return(vec(_mm_cvtepi8_epi16(_mm_shuffle_epi8(v, index))));
 	}
 	/* make mask */
 	inline int64_t mask(void) const {
