@@ -19,7 +19,7 @@ def evaluate_gap(pbsim_path, ref_path, bin_path,
 	ref_gap_length, read_gap_length, bandwidth, error_rate, length, count):
 
 	# m = 2
-	x = -4
+	x = -2
 	gi = -4
 	# ge = -2
 

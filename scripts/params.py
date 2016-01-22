@@ -29,7 +29,8 @@ params_list = [gs, xs, bandwidths, error_rates, lengths]
 ref_gaps = [i for i in range(0, 150, 1)]
 read_gaps = [0]
 bandwidths_gap = bandwidths # [8, 16, 24, 32, 40, 48, 56, 64]
-params_list_gap = [ref_gaps, read_gaps, bandwidths_gap, error_rates, [1000, 10000]]
+# params_list_gap = [ref_gaps, read_gaps, bandwidths_gap, error_rates, [1000, 10000]]
+params_list_gap = [ref_gaps, [0], bandwidths_gap, [0.75], [1000]]
 
 # gi-ge evaluation
 gis = [-i for i in range(0, 6)]

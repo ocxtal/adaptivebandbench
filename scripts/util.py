@@ -280,6 +280,9 @@ def score_hist(elems, bin_size = 30, comp_pair = [0, 1]):
 	except TypeError: return([str(e) for e in bin])
 	# return([clip(elem[0][0] - e[0] + bin_size/2, 0, bin_size-1) for e in elem[1:]])
 
+def path_length(elems):
+	return(sum([len(x[0][3]) for x in elems]) / len(elems))
+
 def table(arr, fn, indices, params_list = params_list, formatter = tab_formatter, comp_pair = [0, 1]):
 	# indices must have two -1's
 	labels = extract_labels(params_list, indices)
