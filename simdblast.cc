@@ -27,19 +27,20 @@ simdblast_linear(
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
-	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
+	int8_t *score_matrix, int8_t ge, int16_t xt)
+	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
 {
 	uint64_t i, a_size, first_a_index, last_a_index, a_index, b_index;
-	vec const mv(m), xv(x), gv(-gi), gv2(-2*gi), gv4(-4*gi), xtv(xt), zv(0), ofsv(OFS);
+	vec const gv(-ge), gv2(-2*ge), gv4(-4*ge), xtv(xt), zv(0), ofsv(OFS);
 	int16_t const acc_g[vec::LEN] __attribute__(( aligned(16) )) = {
 		0,
-		-gi,
-		-2*gi,
-		-3*gi,
-		-4*gi,
-		-5*gi,
-		-6*gi,
-		-7*gi,
+		-ge,
+		-2*ge,
+		-3*ge,
+		-4*ge,
+		-5*ge,
+		-6*ge,
+		-7*ge,
 	};
 
 	int16_t *mat = (int16_t *)aligned_malloc(
@@ -51,14 +52,18 @@ simdblast_linear(
 	/* init top row */
 	int16_t const init[vec::LEN] __attribute__(( aligned(16) )) = {
 		OFS,
-		OFS + gi,
-		OFS + 2*gi,
-		OFS + 3*gi,
-		OFS + 4*gi,
-		OFS + 5*gi,
-		OFS + 6*gi,
-		OFS + 7*gi,
+		OFS + ge,
+		OFS + 2*ge,
+		OFS + 3*ge,
+		OFS + 4*ge,
+		OFS + 5*ge,
+		OFS + 6*ge,
+		OFS + 7*ge,
 	};
+	vec acc_gv; acc_gv.load(acc_g);
+
+	int8_t sc_min = extract_min_score(score_matrix);
+
 	vec init_v; init_v.load(init);
 	for(i = 0; i < roundup(alen, vec::LEN); i += vec::LEN) {
 		if((ofsv - init_v > xtv) == 0xffff) { break; }
@@ -70,16 +75,17 @@ simdblast_linear(
 	first_a_index = 0;
 	vec best_score_v = ofsv;
 	vec next_score_v(gv4);
+	vec smv; smv.load(score_matrix);
 
 	for(b_index = 1; b_index <= blen; b_index++) {
-		vec bv(b[b_index-1]);
+		char_vec bv(encode_b(b[b_index-1]));
 
 		prev = ptr; ptr += (last_a_index + vec::LEN - first_a_index);
 		last_a_index = first_a_index;
 
 		vec score_v = zv;
 		vec prev_pv = gv4;
-		vec prev_av = zv;
+		char_vec prev_av(0ULL);
 		vec best_temp_v = best_score_v;
 		if(first_a_index != 0) { prev_pv = next_score_v; }
 
@@ -98,8 +104,10 @@ simdblast_linear(
 
 			/* calc d */
 			score_v = prev_pv>>7 | pv<<1;
-			vec av; av.load_expand(&a[a_index]);
-			score_v += vec::comp(prev_av>>7 | av<<1, bv).select(mv, xv);
+			// vec av; av.load_expand(&a[a_index]);
+			// score_v += vec::comp(prev_av>>7 | av<<1, bv).select(mv, xv);
+			char_vec av; av.load_encode_a(&a[a_index]);
+			score_v += smv.shuffle(av.dsl(prev_av) | bv);
 			score_v = vec::max(score_v, score_gap_col_v);
 
 			/* chain e */
@@ -112,7 +120,7 @@ simdblast_linear(
 
 			/* xdrop test */
 			if((best_score_v - score_v > xtv) == 0xffff) {
-				vec const xxv(-x);
+				vec const xxv(-sc_min);
 				xxv.store(&ptr[a_index]);
 				if(a_index == first_a_index) {
 					next_score_v = score_v;
@@ -135,21 +143,14 @@ simdblast_linear(
 		} else {
 			best_score_v.print();
 			score_v.print();
-			vec acc_gv; acc_gv.load(acc_g);
-// #if 0
 			while((best_score_v - score_v <= xtv) && a_size <= roundup(alen + 1, vec::LEN)) {
 				score_v = (score_v>>7) - gv;		/* vec::LEN == 8 */
 				score_v.set(score_v[0]);
 				score_v -= acc_gv;
-/*
-				score_v = vec::max(score_v, (score_v - gv)<<1);
-				score_v = vec::max(score_v, (score_v - gv2)<<2);
-				score_v = vec::max(score_v, (score_v - gv4)<<4);*/
 				score_v.store(&ptr[a_size]);
 				a_size += vec::LEN;
 				score_v.print();
 			}
-// #endif
 			// printf("a(%d), b(%d)\n", a_size, b_index);
 			last_a_index = a_size;
 		}
@@ -174,12 +175,13 @@ simdblast_affine(
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
-	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
+	int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt)
+	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
 {
 	uint64_t i, a_size, first_a_index, last_a_index, a_index, b_index;
 	/* gvはaffine gap costにあわせて書き換える */
-	vec const mv(m), xv(x), xtv(xt), zv(0), ofsv(OFS);
-	vec const giv(-gi), gev(-ge), giev(ge-gi), gev3(-3*ge), gev8(-8*ge);
+	vec const xtv(xt), zv(0), ofsv(OFS);
+	vec const giv(-gi), gev(-ge), gev2(-2*ge), gev4(-4*ge), gev8(-8*ge);
 	int16_t const acc_ge[vec::LEN] __attribute__(( aligned(16) )) = {
 		0,
 		-ge,
@@ -190,6 +192,9 @@ simdblast_affine(
 		-6*ge,
 		-7*ge
 	};
+	vec acc_gev; acc_gev.load(acc_ge);
+
+	int8_t sc_min = extract_min_score(score_matrix);
 
 	struct _dp {
 		int16_t best[vec::LEN];
@@ -204,18 +209,18 @@ simdblast_affine(
 	debug("%llu, %llu, %llu, %llu, %lu", alen, roundup((alen + 1), vec::LEN), roundup((alen + 1), vec::LEN) / vec::LEN + 1, blen, sizeof(struct _dp));
 
 	/* init top row */
+	/*
 	int16_t const init[vec::LEN] __attribute__(( aligned(16) )) = {
 		OFS,
-		OFS + gi,
 		OFS + gi + ge,
 		OFS + gi + 2*ge,
 		OFS + gi + 3*ge,
 		OFS + gi + 4*ge,
 		OFS + gi + 5*ge,
 		OFS + gi + 6*ge
+		OFS + gi + 7*ge,
 	};
 	int16_t const init_g[vec::LEN] __attribute__(( aligned(16) )) = {
-		OFS + gi - ge,
 		OFS + gi,
 		OFS + gi + ge,
 		OFS + gi + 2*ge,
@@ -223,14 +228,20 @@ simdblast_affine(
 		OFS + gi + 4*ge,
 		OFS + gi + 5*ge,
 		OFS + gi + 6*ge,
+		OFS + gi + 7*ge,
 	};
-	vec init_v; init_v.load(init);
-	vec init_gv; init_gv.load(init_g);
-	for(i = 0; i < roundup(alen + 1, vec::LEN) / vec::LEN; i++) {
+	*/
+	// vec init_v; init_v.load(init);
+	// vec init_gv; init_gv.load(init_g);
+	vec init_v = ofsv - (giv<<1) - acc_gev;
+	init_v.store(&ptr[0].best);
+	(init_v - giv).store(&ptr[0].best_gap);
+	init_v = ofsv - giv - gev8 - acc_gev;
+	for(i = 1; i < roundup(alen + 1, vec::LEN) / vec::LEN; i++) {
 		if((ofsv - init_v > xtv) == 0xffff) { break; }
 		init_v.store(&ptr[i].best);
-		(init_v - giev).store(&ptr[i].best_gap);
-		init_gv -= gev8; init_v = init_gv;
+		(init_v - giv).store(&ptr[i].best_gap);
+		init_v -= gev8;
 	}
 
 	debug("%llu", i);
@@ -239,9 +250,10 @@ simdblast_affine(
 	first_a_index = 0;
 	vec best_score_v = ofsv;
 	vec next_score_v;
+	vec smv; smv.load(score_matrix);
 
 	for(b_index = 1; b_index <= blen; b_index++) {
-		vec bv(b[b_index-1]);
+		char_vec bv(encode_b(b[b_index-1]));
 
 		debug("%llu", last_a_index + 1 - first_a_index);
 		prev = ptr; ptr += (last_a_index + 1 - first_a_index);
@@ -249,8 +261,8 @@ simdblast_affine(
 
 		vec score_v = zv;
 		vec score_gap_row_v = zv;
-		vec prev_pv = giv + gev3;
-		vec prev_av = zv;
+		vec prev_pv = giv + gev4;
+		char_vec prev_av(0ULL);
 		vec best_temp_v = best_score_v;
 
 		debug("loop b(%llu), first_a_index(%llu), a_size(%llu)", b_index, first_a_index, a_size);
@@ -262,30 +274,33 @@ simdblast_affine(
 			pv.print();
 
 			/* calc f */
-			vec score_gap_col_v = vec::max(pv - giv, pf - gev);
+			vec score_gap_col_v = vec::max(pv - giv, pf) - gev;
 
 			/* calc e */
-			score_gap_row_v = vec::max(score_v - giv, score_gap_row_v - gev)>>7;
+			score_gap_row_v = (vec::max(score_v - giv, score_gap_row_v) - gev)>>7;
 
 			/* calc d */
-			score_v = prev_pv>>7 | pv<<1;
+			// score_v = prev_pv>>7 | pv<<1;
+			score_v = pv.dsl(prev_pv);
 			// vec av('A');
-			vec av; av.load_expand(&a[a_index * vec::LEN]);
-			score_v += vec::comp(prev_av>>7 | av<<1, bv).select(mv, xv);
+			// vec av; av.load_expand(&a[a_index * vec::LEN]);
+			// score_v += vec::comp(prev_av>>7 | av<<1, bv).select(mv, xv);
+			char_vec av; av.load_encode_a(&a[a_index * vec::LEN]);
+			score_v += smv.shuffle(av.dsl(prev_av) | bv);
 			score_v = vec::max(score_v, score_gap_col_v);
 
 			/* chain e */
 			score_v = vec::max(score_v, score_gap_row_v);
-			score_gap_row_v = vec::max(score_v - giv, score_gap_row_v - gev)<<1;
+			score_gap_row_v = (vec::max(score_v - giv, score_gap_row_v) - gev)<<1;
 			score_v = vec::max(score_v, score_gap_row_v);
-			score_gap_row_v = vec::max(score_v - giv - gev, score_gap_row_v - gev - gev)<<2;
+			score_gap_row_v = (vec::max(score_v - giv, score_gap_row_v) - gev2)<<2;
 			score_v = vec::max(score_v, score_gap_row_v);
-			score_gap_row_v = vec::max(score_v - giv - gev3, score_gap_row_v - gev - gev3)<<4;
-			score_v = vec::max(score_v, score_gap_row_v); score_v.print();
+			score_gap_row_v = (vec::max(score_v - giv, score_gap_row_v) - gev4)<<4;
+			score_v = vec::max(score_v, score_gap_row_v);
 
 			/* xdrop test */
 			if((best_score_v - score_v > xtv) == 0xffff) {
-				vec const xxv(-x);
+				vec const xxv(-sc_min);
 				xxv.store(&ptr[a_index].best);
 				xxv.store(&ptr[a_index].best_gap);
 				if(a_index == first_a_index) {
@@ -308,13 +323,12 @@ simdblast_affine(
 		if(last_a_index < a_size - 1) {
 			a_size = last_a_index + 1;
 		} else {
-			vec acc_gev; acc_gev.load(acc_ge);
 			score_v.print(); score_gap_row_v.print();
 			while((best_score_v - score_v <= xtv) && a_size <= roundup(alen + 1, vec::LEN) / vec::LEN) {
-				score_v = vec::max(score_v - giv, score_gap_row_v - gev)>>7; score_v.print();
-				score_v.set(score_v[0]); score_v.print();
-				score_v -= acc_gev; score_v.print();
-				score_gap_row_v = score_v - giev;
+				score_v = (vec::max(score_v - giv, score_gap_row_v) - gev)>>7;
+				score_v.set(score_v[0]);
+				score_v -= acc_gev;
+				score_gap_row_v = score_v - giv;
 				score_v.store(&ptr[a_size].best);
 				score_gap_row_v.store(&ptr[a_size].best_gap);
 				a_size++;
@@ -337,6 +351,7 @@ simdblast_affine(
 }
 
 #ifdef MAIN
+#include <assert.h>
 #include <stdlib.h>
 int main_ext(int argc, char *argv[])
 {
@@ -350,20 +365,20 @@ int main_ext(int argc, char *argv[])
 	memcpy(b, argv[3], blen);
 	memset(b + blen, 0x80, vec::LEN + 1);
 
+	int8_t score_matrix[16] __attribute__(( aligned(16) ));
+	build_score_matrix(score_matrix, atoi(argv[4]), atoi(argv[5]));
+
 	if(strcmp(argv[1], "linear") == 0) {
 		int score = simdblast_linear(
 			a, alen, b, blen,
-			atoi(argv[4]),
-			atoi(argv[5]),
+			score_matrix,
 			atoi(argv[6]),
-			atoi(argv[7]),
-			atoi(argv[8]));
+			atoi(argv[7]));
 		printf("%d\n", score);
 	} else if(strcmp(argv[1], "affine") == 0) {
 		int score = simdblast_affine(
 			a, alen, b, blen,
-			atoi(argv[4]),
-			atoi(argv[5]),
+			score_matrix,
 			atoi(argv[6]),
 			atoi(argv[7]),
 			atoi(argv[8]));
@@ -378,17 +393,47 @@ int main_ext(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
-	char const *a = "aabbcccccc";
+	char const *a = "aattcccccc";
 	char const *b = "aacccccc";
 	// char const *a = "abefpppbbqqqqghijkltttt";
 	// char const *b = "abcdefpppqqqqijklggtttt";
 
 	if(argc > 1) { return(main_ext(argc, argv)); }
 
-	int sl = simdblast_linear(a, strlen(a), b, strlen(b), 2, -3, -5, -1, 30);
+	int8_t score_matrix[16] __attribute__(( aligned(16) ));
+	build_score_matrix(score_matrix, 1, -1);
+
+	#define l(s, p, q) { \
+		assert(simdblast_linear(p, strlen(p), q, strlen(q), score_matrix, -1, 10) == (s)); \
+	}
+	l( 0, "", "");
+	l( 0, "A", "");
+	l( 1, "A", "A");
+	l( 3, "AAA", "AAA");
+	l( 0, "AAA", "TTT");
+	l( 3, "AAAGGG", "AAATTTTTT");
+	l( 3, "TTTGGGGGAAAA", "TTTCCCCCCCCAAAA");
+	l( 5, "AAACAAAGGG", "AAAAAATTTTTTT");
+	l( 4, "AAACCAAAGGG", "AAAAAATTTTTTT");
+
+
+	#define a(s, p, q) { \
+		assert(simdblast_affine(p, strlen(p), q, strlen(q), score_matrix, -1, -1, 10) == (s)); \
+	}
+	a( 0, "", "");
+	a( 0, "A", "");
+	a( 1, "A", "A");
+	a( 3, "AAA", "AAA");
+	a( 0, "AAA", "TTT");
+	a( 3, "AAAGGG", "AAATTTTTT");
+	a( 3, "TTTGGGGGAAAA", "TTTCCCCCCCCAAAA");
+	a( 4, "AAACAAAGGG", "AAAAAATTTTTTT");
+	a( 3, "AAACCAAAGGG", "AAAAAATTTTTTT");
+
+	int sl = simdblast_linear(a, strlen(a), b, strlen(b), score_matrix, -1, 30);
 	printf("%d\n", sl);
 
-	int sa = simdblast_affine(a, strlen(a), b, strlen(b), 2, -3, -5, -1, 20);
+	int sa = simdblast_affine(a, strlen(a), b, strlen(b), score_matrix, -1, -1, 30);
 	printf("%d\n", sa);
 
 	return(0);

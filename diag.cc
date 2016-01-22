@@ -25,21 +25,29 @@ diag_linear(
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
-	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
+	int8_t *score_matrix, int8_t ge, int16_t xt)
+	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
 {
+	if(alen == 0 || blen == 0) { return(0); }
+	debug("%s, %s", a, b);
+
 	uint16_t *mat = (uint16_t *)aligned_malloc(
 		(alen+blen+1) * BW * sizeof(uint16_t),
 		sizeof(__m128i));
 	uint16_t *ptr = mat;
 
+	/* extract max and min */
+	int8_t sc_max = extract_max_score(score_matrix);
+	// int8_t sc_min = extract_min_score(score_matrix);
+
 	struct _w {
-		uint16_t b[BW];
-		uint16_t pad1[8];
-		uint16_t a[BW];
+		int8_t b[BW];
+		int8_t pad1[vec::SIZE];
+		int8_t a[BW];
 		uint16_t pv[BW];
-		uint16_t pad2[8];
+		uint16_t pad2[vec::LEN];
 		uint16_t cv[BW];
-		uint16_t pad3[8];
+		uint16_t pad3[vec::LEN];
 		uint16_t max[BW];
 	} w __attribute__(( aligned(16) ));
 
@@ -49,15 +57,15 @@ diag_linear(
 		w.b[i] = 0xff;
 	}
 	for(uint64_t i = 0; i < (uint64_t)BW/2; i++) {
-		w.a[BW/2 - i - 1] = a[i];
-		w.b[BW/2 + i] = b[i];
+		w.a[BW/2 - i - 1] = encode_a(a[i]);
+		w.b[BW/2 + i] = encode_b(b[i]);
 	}
 
 	/* init vec */
 	#define _Q(x)		( (x) - BW/2 )
 	for(int i = 0; i < (int)BW; i++) {
-		w.pv[i] =      (_Q(i) < 0 ? -_Q(i)   : _Q(i)) * (2*gi - m) + OFS;
-		w.cv[i] = gi + (_Q(i) < 0 ? -_Q(i)-1 : _Q(i)) * (2*gi - m) + OFS;
+		w.pv[i] =      (_Q(i) < 0 ? -_Q(i)   : _Q(i)) * (2*ge - sc_max) + OFS;
+		w.cv[i] = ge + (_Q(i) < 0 ? -_Q(i)-1 : _Q(i)) * (2*ge - sc_max) + OFS;
 		debug("pv(%d), cv(%d)", w.pv[i], w.cv[i]);
 	}
 	#undef _Q
@@ -69,37 +77,39 @@ diag_linear(
 
 	/* init maxv */
 	for(uint64_t i = 0; i < (uint64_t)BW; i++) {
-		w.max[i] = w.cv[i];
+		w.max[i] = w.pv[i];
 		debug("max(%u)", w.max[i]);
 	}
 
 	uint64_t apos = BW/2;
 	uint64_t bpos = BW/2;
 	uint64_t const L = vec::LEN;
-	vec const mv(m), xv(x), giv(-gi);
+	// vec const mv(m), xv(x), giv(-gi);
+	vec smv, gev(-ge); smv.load(score_matrix);
 	for(uint64_t p = 0; p < (uint64_t)(alen+blen-1); p++) {
 		if((p & 0x01) == 0x01)  {
 //			debug("go down");
-			w.pad1[0] = b[bpos++];
+			w.pad1[0] = encode_b(b[bpos++]);
 
-			vec cb; cb.load(w.b);
+			char_vec cb; cb.load(w.b);
 			vec ch; ch.load(w.cv);
 			for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
 				debug("loop: %llu", i);
-				vec va; va.load(&w.a[L*i]);
-				vec tb; tb.load(&w.b[L*(i+1)]);
-				vec vb = (tb<<7) | (cb>>1);
+				char_vec va; va.load(&w.a[L*i]);
+				char_vec tb; tb.load(&w.b[L*(i+1)]);
+				char_vec vb = tb.dsr(cb);
 				cb = tb; vb.store(&w.b[L*i]);
 
-				vec scv = vec::comp(va, vb).select(mv, xv);
+				// vec scv = vec::comp(va, vb).select(mv, xv);
+				vec scv = smv.shuffle(va | vb);
 
 				vec vd; vd.load(&w.pv[L*i]);
 				vec th; th.load(&w.cv[L*(i+1)]);
 				vec vv = ch; ch.store(&w.pv[L*i]);
-				vec vh = (th<<7) | (ch>>1);
+				vec vh = th.dsr(ch);
 				ch = th;
 
-				vec nv = vec::max(vec::max(vh, vv) - giv, vd + scv);
+				vec nv = vec::max(vec::max(vh, vv) - gev, vd + scv);
 				nv.store(&w.cv[L*i]); nv.print();
 				nv.store(&ptr[L*i]);
 
@@ -108,26 +118,27 @@ diag_linear(
 			}
 		} else {
 //			debug("go right");
-			w.pad1[7] = a[apos++];
+			w.pad1[vec::SIZE-1] = encode_a(a[apos++]);
 
-			vec ca; ca.load(w.pad1);
+			char_vec ca; ca.load(&w.pad1[vec::SIZE/2]);
 			vec cv; cv.zero();
 			for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
 				debug("loop: %llu", i);
-				vec ta; ta.load(&w.a[L*i]);
-				vec va = (ta<<1) | (ca>>7);
-				vec vb; vb.load(&w.b[L*i]);
+				char_vec ta; ta.load(&w.a[L*i]);
+				char_vec va = ta.dsl(ca);
+				char_vec vb; vb.load(&w.b[L*i]);
 				ca = ta; va.store(&w.a[L*i]);
 
-				vec scv = vec::comp(va, vb).select(m, x);
+				// vec scv = vec::comp(va, vb).select(mv, xv);
+				vec scv = smv.shuffle(va | vb);
 
 				vec vd; vd.load(&w.pv[L*i]);
 				vec tv; tv.load(&w.cv[L*i]);
 				vec vh = tv; tv.store(&w.pv[L*i]);
-				vec vv = (tv<<1) | (cv>>7);
+				vec vv = tv.dsl(cv);
 				cv = tv;
 
-				vec nv = vec::max(vec::max(vh, vv) - giv, vd + scv);
+				vec nv = vec::max(vec::max(vh, vv) - gev, vd + scv);
 				nv.store(&w.cv[L*i]); nv.print();
 				nv.store(&ptr[L*i]);
 
@@ -165,17 +176,27 @@ diag_affine(
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
-	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
+	int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt)
+	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
 {
+	if(alen == 0 || blen == 0) { return(0); }
+	debug("%s, %s", a, b);
+
 	uint16_t *mat = (uint16_t *)aligned_malloc(
 		(alen+blen+1) * 3 * BW * sizeof(uint16_t),
 		sizeof(__m128i));
 	uint16_t *ptr = mat;
 
+	/* extract max and min */
+	int8_t sc_max = extract_max_score(score_matrix);
+	int8_t sc_min = extract_min_score(score_matrix);
+	/* fix gap open penalty */
+	gi += ge;
+
 	struct _w {
-		uint16_t b[BW];
-		uint16_t pad1[8];
-		uint16_t a[BW];
+		int8_t b[BW];
+		int8_t pad1[vec::SIZE];
+		int8_t a[BW];
 		uint16_t pv[BW];
 		uint16_t pad2[8];
 		uint16_t cv[BW];
@@ -192,52 +213,54 @@ diag_affine(
 		w.b[i] = 0xff;
 	}
 	for(uint64_t i = 0; i < (uint64_t)BW/2; i++) {
-		w.a[BW/2 - i - 1] = a[i];
-		w.b[BW/2 + i] = b[i];
+		w.a[BW/2 - i - 1] = encode_a(a[i]);
+		w.b[BW/2 + i] = encode_b(b[i]);
 	}
 
 	/* init vec */
 	#define _Q(x)		( (x) - BW/2 )
 	for(int i = 0; i < (int)BW; i++) {
-		w.pv[i] =      (_Q(i) < 0 ? -_Q(i)   : _Q(i)) * (2*gi - m) + OFS;
-		w.cv[i] = gi + (_Q(i) < 0 ? -_Q(i)-1 : _Q(i)) * (2*gi - m) + OFS;
-		w.ce[i] = gi + (_Q(i) < 0 ? -_Q(i)-1 : _Q(i)+1) * (2*gi - m) + OFS;
-		w.cf[i] = gi + (_Q(i) < 0 ? -_Q(i) : _Q(i)) * (2*gi - m) + OFS;
+		w.pv[i] =      (_Q(i) < 0 ? -_Q(i)   : _Q(i)) * (2*gi - sc_max) + OFS;
+		w.cv[i] = gi + (_Q(i) < 0 ? -_Q(i)-1 : _Q(i)) * (2*gi - sc_max) + OFS;
+		w.ce[i] = gi + (_Q(i) < 0 ? -_Q(i)-1 : _Q(i)+1) * (2*gi - sc_max) + OFS;
+		w.cf[i] = gi + (_Q(i) < 0 ? -_Q(i) : _Q(i)) * (2*gi - sc_max) + OFS;
 		debug("pv(%d), cv(%d)", w.pv[i], w.cv[i]);
 	}
 	#undef _Q
 
 	/* init pad */
 	for(uint64_t i = 0; i < 8; i++) {
-		w.pad1[i] = 0; w.pad2[i] = 0;
-		w.pad3[i] = 0; w.pad4[i] = 0;
+		w.pad1[i] = 0; w.pad2[i] = -sc_min;
+		w.pad3[i] = -gi; w.pad4[i] = -ge;
 	}
 
 	/* init maxv */
 	for(uint64_t i = 0; i < (uint64_t)BW; i++) {
-		w.max[i] = w.cv[i];
+		w.max[i] = w.pv[i];
 	}
 
 	uint64_t apos = BW/2;
 	uint64_t bpos = BW/2;
 	uint64_t const L = vec::LEN;
-	vec mv(m), xv(x), giv(-gi), gev(-ge);
+	// vec mv(m), xv(x), giv(-gi), gev(-ge);
+	vec smv, giv(-gi), gev(-ge); smv.load(score_matrix);
 	for(uint64_t p = 0; p < (uint64_t)(alen+blen-1); p++) {
 		if((p & 0x01) == 0x01)  {
 //			debug("go down");
-			w.pad1[0] = b[bpos++];
+			w.pad1[0] = encode_b(b[bpos++]);
 
-			vec cb; cb.load(w.b);
+			char_vec cb; cb.load(w.b);
 			vec ch; ch.load(w.cv);
 			vec ce; ce.load(w.ce);
 			for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
 				debug("loop: %llu", i);
-				vec va; va.load(&w.a[L*i]);
-				vec tb; tb.load(&w.b[L*(i+1)]);
-				vec vb = (tb<<7) | (cb>>1);
+				char_vec va; va.load(&w.a[L*i]);
+				char_vec tb; tb.load(&w.b[L*(i+1)]);
+				char_vec vb = tb.dsr(cb);
 				cb = tb; vb.store(&w.b[L*i]);
 
-				vec scv = vec::comp(va, vb).select(mv, xv);
+				// vec scv = vec::comp(va, vb).select(mv, xv);
+				vec scv = smv.shuffle(va | vb);
 
 				/* load pv */
 				vec vd; vd.load(&w.pv[L*i]);
@@ -245,13 +268,13 @@ diag_affine(
 				/* load v and h */
 				vec th; th.load(&w.cv[L*(i+1)]);
 				vec vv = ch; ch.store(&w.pv[L*i]);
-				vec vh = (th<<7) | (ch>>1);
+				vec vh = th.dsr(ch);
 				ch = th;
 
 				/* load f and e */
 				vec te; te.load(&w.ce[L*(i+1)]);
 				vec vf; vf.load(&w.cf[L*i]);
-				vec ve = (te<<7) | (ce>>1);
+				vec ve = te.dsr(ce);
 				ce = te;
 
 				/* update e and f */
@@ -270,19 +293,20 @@ diag_affine(
 			}
 		} else {
 //			debug("go right");
-			w.pad1[7] = a[apos++];
+			w.pad1[vec::SIZE-1] = encode_a(a[apos++]);
 
-			vec ca; ca.load(w.pad1);
+			char_vec ca; ca.load(&w.pad1[vec::SIZE/2]);
 			vec cv; cv.zero();
 			vec cf; cf.zero();
 			for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
 				debug("loop: %llu", i);
-				vec ta; ta.load(&w.a[L*i]);
-				vec va = (ta<<1) | (ca>>7);
-				vec vb; vb.load(&w.b[L*i]);
+				char_vec ta; ta.load(&w.a[L*i]);
+				char_vec va = ta.dsl(ca);
+				char_vec vb; vb.load(&w.b[L*i]);
 				ca = ta; va.store(&w.a[L*i]);
 
-				vec scv = vec::comp(va, vb).select(m, x);
+				// vec scv = vec::comp(va, vb).select(mv, xv);
+				vec scv = smv.shuffle(va | vb);
 
 				/* load pv */
 				vec vd; vd.load(&w.pv[L*i]);
@@ -290,13 +314,13 @@ diag_affine(
 				/* load v and h */
 				vec tv; tv.load(&w.cv[L*i]);
 				vec vh = tv; tv.store(&w.pv[L*i]);
-				vec vv = (tv<<1) | (cv>>7);
+				vec vv = tv.dsl(cv);
 				cv = tv;
 
 				/* load f and e */
 				vec ve; ve.load(&w.ce[L*i]);
 				vec tf; tf.load(&w.cf[L*i]);
-				vec vf = (tf<<1) | (cf>>7);
+				vec vf = tf.dsl(cf);
 				cf = tf;
 
 				/* update e and f */
@@ -330,6 +354,7 @@ diag_affine(
 }
 
 #ifdef MAIN
+#include <assert.h>
 #include <stdlib.h>
 int main_ext(int argc, char *argv[])
 {
@@ -343,20 +368,20 @@ int main_ext(int argc, char *argv[])
 	memcpy(b, argv[3], blen);
 	memset(b + blen, 0x80, vec::LEN + 1);
 
+	int8_t score_matrix[16] __attribute__(( aligned(16) ));
+	build_score_matrix(score_matrix, atoi(argv[4]), atoi(argv[5]));
+
 	if(strcmp(argv[1], "linear") == 0) {
 		int score = diag_linear(
 			a, alen, b, blen,
-			atoi(argv[4]),
-			atoi(argv[5]),
+			score_matrix,
 			atoi(argv[6]),
-			atoi(argv[7]),
-			atoi(argv[8]));
+			atoi(argv[7]));
 		printf("%d\n", score);
 	} else if(strcmp(argv[1], "affine") == 0) {
 		int score = diag_affine(
 			a, alen, b, blen,
-			atoi(argv[4]),
-			atoi(argv[5]),
+			score_matrix,
 			atoi(argv[6]),
 			atoi(argv[7]),
 			atoi(argv[8]));
@@ -371,17 +396,46 @@ int main_ext(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
-	char const *a = "aabbcccccc";
+	char const *a = "aattcccccc";
 	char const *b = "aacccccc";
 	// char const *a = "abefpppbbqqqqghijkltttt";
 	// char const *b = "abcdefpppqqqqijklggtttt";
 
 	if(argc > 1) { return(main_ext(argc, argv)); }
 
-	int sl = diag_linear(a, strlen(a), b, strlen(b), 2, -3, -5, -1, 30);
+	int8_t score_matrix[16] __attribute__(( aligned(16) ));
+	build_score_matrix(score_matrix, 1, -1);
+
+	#define l(s, p, q) { \
+		assert(diag_linear(p, strlen(p), q, strlen(q), score_matrix, -1, 10) == (s)); \
+	}
+	l( 0, "", "");
+	l( 0, "A", "");
+	l( 1, "A", "A");
+	l( 3, "AAA", "AAA");
+	l( 0, "AAA", "TTT");
+	l( 3, "AAAGGG", "AAATTTTTT");
+	l( 3, "TTTGGGGGAAAA", "TTTCCCCCCCCAAAA");
+	l( 5, "AAACAAAGGG", "AAAAAATTTTTTT");
+	l( 4, "AAACCAAAGGG", "AAAAAATTTTTTT");
+
+	#define a(s, p, q) { \
+		assert(diag_affine(p, strlen(p), q, strlen(q), score_matrix, -1, -1, 10) == (s)); \
+	}
+	a( 0, "", "");
+	a( 0, "A", "");
+	a( 1, "A", "A");
+	a( 3, "AAA", "AAA");
+	a( 0, "AAA", "TTT");
+	a( 3, "AAAGGG", "AAATTTTTT");
+	a( 3, "TTTGGGGGAAAA", "TTTCCCCCCCCAAAA");
+	a( 4, "AAACAAAGGG", "AAAAAATTTTTTT");
+	a( 3, "AAACCAAAGGG", "AAAAAATTTTTTT");
+
+	int sl = diag_linear(a, strlen(a), b, strlen(b), score_matrix, -1, 30);
 	printf("%d\n", sl);
 
-	int sa = diag_affine(a, strlen(a), b, strlen(b), 2, -3, -5, -1, 30);
+	int sa = diag_affine(a, strlen(a), b, strlen(b), score_matrix, -1, -1, 30);
 	printf("%d\n", sa);
 
 	return(0);
