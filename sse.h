@@ -135,6 +135,18 @@ public:
 	inline void storeu(void *ptr) const {
 		store(ptr);
 	}
+	/* print */
+	#ifdef DEBUG
+	void print(void) const {
+		print(stderr);
+	}
+	void print(FILE *fp) const {
+		fprintf(fp, "[%016llx]\n", v);
+	}
+	#else
+	void print(void) const {}
+	void print(FILE *fp) const {}
+	#endif
 };
 
 /**
