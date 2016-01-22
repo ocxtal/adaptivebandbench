@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 // #include <gperftools/profiler.h>
 #include <sys/time.h>
 #include "util.h"
@@ -136,8 +137,40 @@ char *mseq(char const *seq, int x, int ins, int del)
 	return(mod);
 }
 
+int print_msg(int flag, char const *fmt, ...)
+{
+	int r = 0;
+	if(flag == 0) {
+		va_list l;
+		va_start(l, fmt);
+		r = vfprintf(stdout, fmt, l);
+		va_end(l);
+	}
+	return(r);
+}
+
+int print_bench(int flag, char const *name, int64_t l, int64_t a, int64_t sl, int64_t sa)
+{
+	if(flag == 0) {
+		printf("%s\t%lld\t%lld\t%lld\t%lld\n", name, l / 1000, a / 1000, sl, sa);
+	} else if(flag == 1) {
+		printf("%lld\t%lld\t", l / 1000, a / 1000);
+	} else if(flag == 2) {
+		printf("%lld\t", a / 1000);
+	}
+}
+
 int main(int argc, char *argv[])
 {
+	int flag = 0;
+	if(argc > 1 && strcmp(argv[1], "-s") == 0) {
+		flag = 1;
+		argc--; argv++;
+	} else if(argc > 1 && strcmp(argv[1], "-a") == 0) {
+		flag = 2;
+		argc--; argv++;
+	}
+
 	int i;
 	int const m = 1, x = -1, gi = -1, ge = -1;
 	int const xt = 30;
@@ -157,7 +190,7 @@ int main(int argc, char *argv[])
 	gettimeofday(&tv, NULL);
 	unsigned long s = (argc > 3) ? atoi(argv[3]) : tv.tv_usec;
 	srand(s);
-	printf("%lu\n", s);
+	print_msg(flag, "%lu\n", s);
 
 	a = rseq(len * 9 / 10);
 	b = mseq(a, 10, 40, 40);
@@ -165,13 +198,13 @@ int main(int argc, char *argv[])
 	bt = rseq(len / 10);
 	a = (char *)realloc(a, 2*len); strcat(a, at); free(at);
 	b = (char *)realloc(b, 2*len); strcat(b, bt); free(bt);
-	printf("%p, %p\n", a, b);
+	print_msg(flag, "%p, %p\n", a, b);
 
-	// printf("%s\n%s\n", a, b);
+	// print_msg(flag, "%s\n%s\n", a, b);
 
-	printf("len:\t%d\ncnt:\t%d\n", len, cnt);
-	printf("m: %d\tx: %d\tgi: %d\tge: %d\n", m, x, gi, ge);
-	printf("alg\tlinear\taffine\tsc(l)\tsc(a)\n");
+	print_msg(flag, "len:\t%d\ncnt:\t%d\n", len, cnt);
+	print_msg(flag, "m: %d\tx: %d\tgi: %d\tge: %d\n", m, x, gi, ge);
+	print_msg(flag, "alg\tlinear\taffine\tsc(l)\tsc(a)\n");
 
 #ifdef FULL
 	/* full */
@@ -191,10 +224,7 @@ int main(int argc, char *argv[])
 		free(r.path);
 	}
 	bench_end(fa);
-	printf("full:\t%lld\t%lld\t%lld\t%lld\n",
-		bench_get(fl) / 1000,
-		bench_get(fa) / 1000,
-		sfl, sfa);
+	print_bench(flag, "full", bench_get(fl), bench_get(fa), sfl, sfa);
 #endif
 
 #ifdef ALL
@@ -211,10 +241,7 @@ int main(int argc, char *argv[])
 		sra += rognes_affine(a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
 	}
 	bench_end(ra);
-	printf("rognes:\t%lld\t%lld\t%lld\t%lld\n",
-		bench_get(rl) / 1000,
-		bench_get(ra) / 1000,
-		srl, sra);
+	print_bench(flag, "rognes", bench_get(rl), bench_get(ra), srl, sra);
 #endif
 
 	/* blast */
@@ -230,10 +257,7 @@ int main(int argc, char *argv[])
 		sba += blast_affine(a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
 	}
 	bench_end(ba);
-	printf("blast:\t%lld\t%lld\t%lld\t%lld\n",
-		bench_get(bl) / 1000,
-		bench_get(ba) / 1000,
-		sbl, sba);
+	print_bench(flag, "blast", bench_get(bl), bench_get(ba), sbl, sba);
 
 #ifdef ALL
 	/* simdblast */
@@ -249,10 +273,7 @@ int main(int argc, char *argv[])
 		ssa += simdblast_affine(a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
 	}
 	bench_end(sa);
-	printf("simd:\t%lld\t%lld\t%lld\t%lld\n",
-		bench_get(sl) / 1000,
-		bench_get(sa) / 1000,
-		ssl, ssa);
+	print_bench(flag, "simd", bench_get(sl), bench_get(sa), ssl, ssa);
 
 	/* diag */
 	bench_init(dl);
@@ -267,10 +288,7 @@ int main(int argc, char *argv[])
 		sda += diag_affine(a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
 	}
 	bench_end(da);
-	printf("diag:\t%lld\t%lld\t%lld\t%lld\n",
-		bench_get(dl) / 1000,
-		bench_get(da) / 1000,
-		sdl, sda);
+	print_bench(flag, "diag", bench_get(dl), bench_get(da), sdl, sda);
 #endif
 
 	/* dynamic diag */
@@ -286,10 +304,7 @@ int main(int argc, char *argv[])
 		sdda += ddiag_affine(a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
 	}
 	bench_end(dda);
-	printf("ddiag:\t%lld\t%lld\t%lld\t%lld\n",
-		bench_get(ddl) / 1000,
-		bench_get(dda) / 1000,
-		sddl, sdda);
+	print_bench(flag, "ddiag", bench_get(ddl), bench_get(dda), sddl, sdda);
 
 #ifdef SSW
 	/* SSW library */
@@ -323,16 +338,15 @@ int main(int argc, char *argv[])
 		init_destroy(sp);
 	}
 	bench_end(wat);
-	printf("ssw (w/o prep):\t%lld\t\t%lld\n",
-		bench_get(wa) / 1000,
-		swa);
-	printf("ssw (w/ prep):\t%lld\t\t%lld\n",
-		bench_get(wat) / 1000,
-		swat);
+	print_bench(flag, "ssw (w/o prep)", 0, bench_get(wa), 0, swa);
+	print_bench(flag, "ssw (w/ prep)", 0, bench_get(wat), 0, swat);
 	free(na);
 	free(nb);
 #endif
 
+	if(flag != 0) {
+		printf("\n");
+	}
 	free(a);
 	free(b);
 	return 0;
