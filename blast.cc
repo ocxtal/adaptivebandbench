@@ -22,6 +22,9 @@ blast_linear(
 	int8_t *score_matrix, int8_t ge, int16_t xt)
 	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
 {
+	if(alen == 0 || blen == 0) { return(0); }
+	debug("%s, %s", a, b);
+
 	uint64_t i, a_size, first_a_index, last_a_index, a_index, b_index;
 	int16_t best_score, score, next_score, score_gap_row, score_gap_col;
 
@@ -116,6 +119,9 @@ blast_affine(
 	int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt)
 	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
 {
+	if(alen == 0 || blen == 0) { return(0); }
+	debug("%s, %s", a, b);
+
 	uint64_t i, a_size, first_a_index, last_a_index, a_index, b_index;
 	int16_t best_score, score, next_score, score_gap_row, score_gap_col;
 

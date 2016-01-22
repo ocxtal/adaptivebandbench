@@ -296,10 +296,10 @@ int main(int argc, char *argv[])
 	/* convert sequence to number string */
 	int8_t *na = (int8_t *)malloc(strlen(a));
 	int8_t *nb = (int8_t *)malloc(strlen(b));
-	for(i = 0; i < strlen(a); i++) {
+	for(i = 0; i < (int)strlen(a); i++) {
 		na[i] = encode(a[i]);
 	}
-	for(i = 0; i < strlen(b); i++) {
+	for(i = 0; i < (int)strlen(b); i++) {
 		nb[i] = encode(b[i]);
 	}
 
