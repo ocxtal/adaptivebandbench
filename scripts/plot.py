@@ -97,3 +97,51 @@ def plot_gap_bench(in_file, out_file):
 
 plot_gap_bench('../results/stuff/result_gap_linear_1207.txt', 'gap_linear.eps')
 plot_gap_bench('../results/stuff/result_gap_affine_1207.txt', 'gap_affine.eps')
+
+def read_csv(filename):
+
+	with open(filename) as f:
+		a = []
+		l = f.readline()
+		while l:
+			a.append(map(eval, l.strip().split('\t')))
+			l = f.readline()
+
+	return(a)
+
+
+def plot_calc_time(in_file, out_file):
+	
+	variants = ['bm-st (32)', 'blast', 'simdblast', 'st (32)', 'dyn (32)', 'ssw']
+
+	# clear figure
+	plt.clf()
+
+	# ref_gaps, read_gaps = 0, bw, id = 0.75, len = 10k
+	data = np.array(read_csv(in_file))
+
+	for r, bw, d in zip(data.transpose(), variants, dashes):
+		y = r.tolist()
+		x = lengths
+		# print(x, y)
+		l, = plt.plot(x, y, color = 'black', linewidth = linewidth, linestyle = '-', label = str(bw))
+		l.set_dashes(d)
+
+	plt.xlim(90, 10500)
+	plt.xticks(fontsize = fontsize)
+	plt.xlabel('Length (bp)', fontsize = fontsize)
+	plt.xscale('log')
+
+	ymin = 0.95 * min([min(x) for x in data.tolist()])
+	ymax = 1.05 * max([max(x) for x in data.tolist()])
+	plt.ylim(ymin, ymax)
+	plt.yticks(fontsize = fontsize)
+	plt.ylabel('Calc. time (us)', fontsize = fontsize)
+	plt.yscale('log')
+
+	plt.title('Gap insert size - recall rate', fontsize = fontsize)
+	plt.legend(title = 'BW', loc = 'best', fontsize = fontsize * 0.6)
+
+	plt.savefig(out_file, dpi = 72)
+
+plot_calc_time('../results/bench.txt', 'bench.eps')
