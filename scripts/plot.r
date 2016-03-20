@@ -13,7 +13,7 @@ plot_heatmap <- function(title, in_filename, out_filename) {
 		labels = as.character(c(0, 90:100)),
 		right = F)
 
-	color <- c(colorRampPalette(c("red", "blue"))(10), "white")
+	# color <- c(colorRampPalette(c("red", "blue"))(10), "white")
 
 	# plot id_bw
 	p <- ggplot(data, aes(
@@ -23,7 +23,7 @@ plot_heatmap <- function(title, in_filename, out_filename) {
 		label = data[[label[3]]]))
 	p <- p + geom_tile(aes(fill = data[[label[3]]]), colour = 'black') +
 		geom_text(aes(label = data[[label[3]]])) +
-		scale_fill_gradient(limits = c(80, 100), low = "red", high = "white", na.value = "red") +
+		scale_fill_gradient(limits = c(80, 100), low = "gray", high = "white", na.value = "gray") +
 		# scale_fill_gradient(limits = c(80, 100), low = "white", high = "blue", na.value = "red") +
 		# scale_fill_manual(values = color, labels = as.character(c(0, 90:100))) +
 		scale_x_discrete(limits = unique(data[[label[1]]]), expand = c(0, 0)) +
