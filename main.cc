@@ -6,30 +6,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
-// #include <gperftools/profiler.h>
 #include <sys/time.h>
 #include "util.h"
 #include "full.h"
-#include "ssw.h"
 
-// #define ALL
+#include "bench.h"
 
-int rognes_linear(
-	char const *a,
-	uint64_t alen,
-	char const *b,
-	uint64_t blen,
-	int8_t *score_matrix, int8_t ge, int16_t xt);
-	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
-int rognes_affine(
-	char const *a,
-	uint64_t alen,
-	char const *b,
-	uint64_t blen,
-	int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt);
-	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
 
 int blast_linear(
+	void *work,
 	char const *a,
 	uint64_t alen,
 	char const *b,
@@ -37,6 +22,7 @@ int blast_linear(
 	int8_t *score_matrix, int8_t ge, int16_t xt);
 	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
 int blast_affine(
+	void *work,
 	char const *a,
 	uint64_t alen,
 	char const *b,
@@ -45,6 +31,7 @@ int blast_affine(
 	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
 
 int simdblast_linear(
+	void *work,
 	char const *a,
 	uint64_t alen,
 	char const *b,
@@ -52,21 +39,7 @@ int simdblast_linear(
 	int8_t *score_matrix, int8_t ge, int16_t xt);
 	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
 int simdblast_affine(
-	char const *a,
-	uint64_t alen,
-	char const *b,
-	uint64_t blen,
-	int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt);
-	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
-
-int diag_linear(
-	char const *a,
-	uint64_t alen,
-	char const *b,
-	uint64_t blen,
-	int8_t *score_matrix, int8_t ge, int16_t xt);
-	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
-int diag_affine(
+	void *work,
 	char const *a,
 	uint64_t alen,
 	char const *b,
@@ -75,6 +48,7 @@ int diag_affine(
 	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
 
 int ddiag_linear(
+	void *work,
 	char const *a,
 	uint64_t alen,
 	char const *b,
@@ -82,12 +56,98 @@ int ddiag_linear(
 	int8_t *score_matrix, int8_t ge, int16_t xt);
 	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
 int ddiag_affine(
+	void *work,
 	char const *a,
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
 	int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt);
 	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
+
+
+
+/* wrapper of Myers' wavefront algorithm */
+extern "C" {
+	#include "wave/align.h"
+
+	int enlarge_vector(Work_Data *work, int newmax);
+	int enlarge_points(Work_Data *work, int newmax);
+	int forward_wave(Work_Data *work, Align_Spec *spec, Alignment *align, Path *bpath,
+	                        int *mind, int maxd, int mida, int minp, int maxp);
+	int reverse_wave(Work_Data *work, Align_Spec *spec, Alignment *align, Path *bpath,
+	                        int mind, int maxd, int mida, int minp, int maxp);
+}
+
+struct wavefront_work_s {
+	Work_Data *w;
+	Align_Spec *s;
+	Path apath, bpath;
+};
+
+struct wavefront_work_s *wavefront_init_work(void)
+{
+	struct wavefront_work_s *work = (struct wavefront_work_s *)malloc(sizeof(struct wavefront_work_s));
+
+	Work_Data *w = New_Work_Data();
+	enlarge_vector(w, 10000 * (6 * sizeof(int) + sizeof(uint64_t)));
+	enlarge_points(w, 4 * 4096 / 100 * sizeof(uint16_t) + sizeof(Path));
+
+
+	float freq[4] = { 0.25, 0.25, 0.25, 0.25 };
+	Align_Spec *s = New_Align_Spec(0.7, 100, freq);
+
+
+	work->w = w;
+	work->s = s;
+	work->apath.trace = malloc(4096);
+	work->bpath.trace = malloc(4096);
+
+	return(work);
+}
+
+
+void wavefront_clean_work(struct wavefront_work_s *_work)
+{
+	struct wavefront_work_s *work = (struct wavefront_work_s *)_work;
+
+	free(work->apath.trace);
+	free(work->bpath.trace);
+
+	Free_Align_Spec(work->s);
+	Free_Work_Data(work->w);
+
+	free(work);
+	return;	
+}
+
+int 
+wavefront(
+	void *_work,
+	char const *a,
+	uint64_t alen,
+	char const *b,
+	uint64_t blen)
+{
+	struct wavefront_work_s *work = (struct wavefront_work_s *)_work;
+	Work_Data *w = work->w;
+	Align_Spec *s = work->s;
+
+	Alignment aln;
+	aln.path = &work->apath;
+	aln.flags = 0;
+	aln.aseq = (char *)a;
+	aln.bseq = (char *)b;
+	aln.alen = alen;
+	aln.blen = blen;
+
+	int low = 0;
+	int high = 0;
+
+	forward_wave(w, s, &aln, &work->bpath, &low, high, 0, -INT32_MAX, INT32_MAX);
+	return(0);
+}
+
+
 
 
 /**
@@ -158,6 +218,7 @@ int print_bench(int flag, char const *name, int64_t l, int64_t a, int64_t sl, in
 	} else if(flag == 2) {
 		printf("%lld\t", a / 1000);
 	}
+	return(0);
 }
 
 int main(int argc, char *argv[])
@@ -177,11 +238,8 @@ int main(int argc, char *argv[])
 	char *a, *b, *at, *bt;
 	int len = (argc > 1) ? atoi(argv[1]) : 1000;
 	int cnt = (argc > 2) ? atoi(argv[2]) : 1000;
-	bench_t fl, fa, rl, ra, bl, ba, sl, sa, dl, da, ddl, dda, wa, wat;
-	volatile int64_t sfl = 0, sfa = 0, srl = 0, sra = 0;
-	volatile int64_t sbl = 0, sba = 0, ssl = 0, ssa = 0;
-	volatile int64_t sdl = 0, sda = 0, sddl = 0, sdda = 0;
-	volatile int64_t swa = 0, swat = 0;
+	bench_t bl, ba, sl, sa, ddl, dda, wl;
+	volatile int64_t sbl = 0, sba = 0, ssl = 0, ssa = 0, sddl = 0, sdda = 0;
 	struct timeval tv;
 
 	int8_t score_matrix[16] __attribute__(( aligned(16) ));
@@ -206,143 +264,76 @@ int main(int argc, char *argv[])
 	print_msg(flag, "m: %d\tx: %d\tgi: %d\tge: %d\n", m, x, gi, ge);
 	print_msg(flag, "alg\tlinear\taffine\tsc(l)\tsc(a)\n");
 
-#ifdef FULL
-	/* full */
-	bench_init(fl);
-	bench_init(fa);
-	bench_start(fl);
-	for(i = 0; i < cnt; i++) {
-		sw_result_t r = sw_linear(a, strlen(a), b, strlen(b), score_matrix, ge);
-		sfl += r.score;
-		free(r.path);
-	}
-	bench_end(fl);
-	bench_start(fa);
-	for(i = 0; i < cnt; i++) {
-		sw_result_t r = sw_affine(a, strlen(a), b, strlen(b), score_matrix, gi, ge);
-		sfa += r.score;
-		free(r.path);
-	}
-	bench_end(fa);
-	print_bench(flag, "full", bench_get(fl), bench_get(fa), sfl, sfa);
-#endif
 
-#ifdef ALL
-	/* rognes */
-	bench_init(rl);
-	bench_init(ra);
-	bench_start(rl);
-	for(i = 0; i < cnt; i++) {
-		srl += rognes_linear(a, strlen(a), b, strlen(b), score_matrix, ge, xt);
-	}
-	bench_end(rl);
-	bench_start(ra);
-	for(i = 0; i < cnt; i++) {
-		sra += rognes_affine(a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
-	}
-	bench_end(ra);
-	print_bench(flag, "rognes", bench_get(rl), bench_get(ra), srl, sra);
-#endif
+	/* malloc work */
+	void *work = aligned_malloc(1024 * 1024 * 1024, sizeof(__m128i));
+
 
 	/* blast */
 	bench_init(bl);
 	bench_init(ba);
 	bench_start(bl);
 	for(i = 0; i < cnt; i++) {
-		sbl += blast_linear(a, strlen(a), b, strlen(b), score_matrix, ge, xt);
+		sbl += blast_linear(work, a, strlen(a), b, strlen(b), score_matrix, ge, xt);
 	}
 	bench_end(bl);
 	bench_start(ba);
 	for(i = 0; i < cnt; i++) {
-		sba += blast_affine(a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
+		sba += blast_affine(work, a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
 	}
 	bench_end(ba);
 	print_bench(flag, "blast", bench_get(bl), bench_get(ba), sbl, sba);
 
-#ifdef ALL
 	/* simdblast */
 	bench_init(sl);
 	bench_init(sa);
 	bench_start(sl);
 	for(i = 0; i < cnt; i++) {
-		ssl += simdblast_linear(a, strlen(a), b, strlen(b), score_matrix, ge, xt);
+		ssl += simdblast_linear(work, a, strlen(a), b, strlen(b), score_matrix, ge, xt);
 	}
 	bench_end(sl);
 	bench_start(sa);
 	for(i = 0; i < cnt; i++) {
-		ssa += simdblast_affine(a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
+		ssa += simdblast_affine(work, a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
 	}
 	bench_end(sa);
-	print_bench(flag, "simd", bench_get(sl), bench_get(sa), ssl, ssa);
+	print_bench(flag, "simdblast", bench_get(sl), bench_get(sa), ssl, ssa);
 
-	/* diag */
-	bench_init(dl);
-	bench_init(da);
-	bench_start(dl);
-	for(i = 0; i < cnt; i++) {
-		sdl += diag_linear(a, strlen(a), b, strlen(b), score_matrix, ge, xt);
-	}
-	bench_end(dl);
-	bench_start(da);
-	for(i = 0; i < cnt; i++) {
-		sda += diag_affine(a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
-	}
-	bench_end(da);
-	print_bench(flag, "diag", bench_get(dl), bench_get(da), sdl, sda);
-#endif
 
-	/* dynamic diag */
+	/* adaptive banded */
 	bench_init(ddl);
 	bench_init(dda);
 	bench_start(ddl);
 	for(i = 0; i < cnt; i++) {
-		sddl += ddiag_linear(a, strlen(a), b, strlen(b), score_matrix, ge, xt);
+		sddl += ddiag_linear(work, a, strlen(a), b, strlen(b), score_matrix, ge, xt);
 	}
 	bench_end(ddl);
 	bench_start(dda);
 	for(i = 0; i < cnt; i++) {
-		sdda += ddiag_affine(a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
+		sdda += ddiag_affine(work, a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
 	}
 	bench_end(dda);
-	print_bench(flag, "ddiag", bench_get(ddl), bench_get(dda), sddl, sdda);
+	print_bench(flag, "aband", bench_get(ddl), bench_get(dda), sddl, sdda);
 
-#ifdef SSW
-	/* SSW library */
-	/* convert sequence to number string */
-	int8_t *na = (int8_t *)malloc(strlen(a));
-	int8_t *nb = (int8_t *)malloc(strlen(b));
-	for(i = 0; i < (int)strlen(a); i++) {
-		na[i] = encode(a[i]);
-	}
-	for(i = 0; i < (int)strlen(b); i++) {
-		nb[i] = encode(b[i]);
-	}
 
-	bench_init(wa);
-	bench_init(wat);
-	s_profile *sp = ssw_init(na, strlen(a), score_matrix, 4, 1);
-	bench_start(wa);
-	for(i = 0; i < cnt; i++) {
-		s_align *r = ssw_align(sp, nb, strlen(b), -gi-ge, -ge, 0, 0, 0, 30);
-		swa += r->score1;
-		align_destroy(r);
+	free(work);
+
+
+	/* wavefront */
+	bench_init(wl);
+	if(len >= 1000) {
+		/* wavefront algorithm fails to align sequences shorter than 1000 bases */
+
+		struct wavefront_work_s *wwork = wavefront_init_work();
+
+		bench_start(wl);
+		for(i = 0; i < cnt; i++) {
+			wavefront(wwork, a, strlen(a), b, strlen(b));
+		}
+		bench_end(wl);
 	}
-	bench_end(wa);
-	init_destroy(sp);
-	bench_start(wat);
-	for(i = 0; i < cnt; i++) {
-		s_profile *sp = ssw_init(na, strlen(a), score_matrix, 4, 1);
-		s_align *r = ssw_align(sp, nb, strlen(b), -gi-ge, -ge, 0, 0, 0, 30);
-		swat += r->score1;
-		align_destroy(r);
-		init_destroy(sp);
-	}
-	bench_end(wat);
-	print_bench(flag, "ssw (w/o prep)", 0, bench_get(wa), 0, swa);
-	print_bench(flag, "ssw (w/ prep)", 0, bench_get(wat), 0, swat);
-	free(na);
-	free(nb);
-#endif
+	print_bench(flag, "wavefront", bench_get(wl), bench_get(wl), 0, 0);
+
 
 	if(flag != 0) {
 		printf("\n");

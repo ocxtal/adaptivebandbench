@@ -8,14 +8,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 dashes = [
-	[8, 8],
-	[12, 4],
-	[10, 2, 2, 2],
-	[8, 2, 4, 2],
+	[8, 2],
+	[2, 2],
+	[6, 6],
+	[6, 2, 2, 2],
 	[6, 2, 2, 2, 2, 2],
 	[4, 2, 4, 2, 2, 2],
 	[4, 2, 2, 2],
-	[2, 2]]
+	[8, 2, 2, 2]]
 
 linewidth = 1.5
 fontsize = 20
@@ -95,8 +95,8 @@ def plot_gap_bench(in_file, out_file):
 
 # plot gap bench
 
-plot_gap_bench('../results/stuff/result_gap_linear_1207.txt', 'gap_linear.eps')
-plot_gap_bench('../results/stuff/result_gap_affine_1207.txt', 'gap_affine.eps')
+plot_gap_bench('../results/result_gap_linear.txt', 'gap_linear.eps')
+plot_gap_bench('../results/result_gap_affine.txt', 'gap_affine.eps')
 
 def read_csv(filename):
 
@@ -113,7 +113,7 @@ def read_csv(filename):
 def plot_calc_time(in_file, out_file):
 	
 	lengths = [100, 150, 250, 350, 500, 650, 800, 1000, 1500, 2500, 3500, 5000, 6500, 8000, 10000]
-	variants = ['bm-sband (32)', 'blast', 'simdblast', 'sband (32)', 'dband (32)', 'ssw']
+	variants = ['BLAST', 'BLAST (SIMD)', 'Adaptive (32)', 'Wavefront']
 
 	# clear figure
 	plt.clf()
@@ -122,10 +122,15 @@ def plot_calc_time(in_file, out_file):
 	data = np.array(read_csv(in_file))
 
 	for r, bw, d in zip(data.transpose(), variants, dashes):
-		y = r.tolist()
-		x = lengths
+		ys = r.tolist()
+		xs = lengths
+
+		# filt out zeros
+		xs_filt = [x for (x, y) in zip(xs, ys) if y is not 0]
+		ys_filt = [y for (x, y) in zip(xs, ys) if y is not 0]
+
 		# print(x, y)
-		l, = plt.plot(x, y, color = 'black', linewidth = linewidth, linestyle = '-', label = str(bw))
+		l, = plt.plot(xs_filt, ys_filt, color = 'black', linewidth = linewidth, linestyle = '-', label = str(bw))
 		l.set_dashes(d)
 
 	plt.xlim(90, 10500)
@@ -133,8 +138,9 @@ def plot_calc_time(in_file, out_file):
 	plt.xlabel('Length (bp)', fontsize = fontsize)
 	plt.xscale('log')
 
-	ymin = 0.95 * min([min(x) for x in data.tolist()])
-	ymax = 1.05 * max([max(x) for x in data.tolist()])
+	dl = [[x for x in xs if x is not 0] for xs in data.tolist()]
+	ymin = 0.95 * min([min(x) for x in dl])
+	ymax = 1.05 * max([max(x) for x in dl])
 	plt.ylim(ymin, ymax)
 	plt.yticks(fontsize = fontsize)
 	plt.ylabel('Calc. time (us)', fontsize = fontsize)

@@ -23,6 +23,7 @@
  */
 int
 simdblast_linear(
+	void *work,
 	char const *a,
 	uint64_t alen,
 	char const *b,
@@ -47,11 +48,11 @@ simdblast_linear(
 	};
 	vec acc_gv; acc_gv.load(acc_g);
 
-	int16_t *mat = (int16_t *)aligned_malloc(
-		(roundup((alen + 1), vec::LEN) + 2*vec::LEN) * (blen + 1) * sizeof(int16_t),
-		vec::SIZE);
+	// int16_t *mat = (int16_t *)aligned_malloc(
+		// (roundup((alen + 1), vec::LEN) + 2*vec::LEN) * (blen + 1) * sizeof(int16_t),
+		// vec::SIZE);
 	debug("%llu, %llu, %llu, %llu", alen, roundup((alen + 2), vec::LEN), (blen + 1), roundup((alen + 2), vec::LEN) * (blen + 1) * sizeof(int16_t));
-	int16_t *ptr = mat, *prev;
+	int16_t *ptr = (int16_t *)work, *prev;
 
 	/* init top row */
 	int16_t const init[vec::LEN] __attribute__(( aligned(16) )) = {
@@ -168,7 +169,7 @@ simdblast_linear(
 */
 		best_score_v.set(best_temp_v.hmax());
 	}
-	free(mat);
+	// free(mat);
 
 	debug("%d", best_score_v.hmax() - OFS);
 	return(best_score_v.hmax() - OFS);
@@ -179,6 +180,7 @@ simdblast_linear(
  */
 int
 simdblast_affine(
+	void *work,
 	char const *a,
 	uint64_t alen,
 	char const *b,
@@ -211,10 +213,10 @@ simdblast_affine(
 		int16_t best[vec::LEN];
 		int16_t best_gap[vec::LEN];
 	};
-	struct _dp *mat = (struct _dp *)aligned_malloc(
-		(roundup(alen + 1, vec::LEN) / vec::LEN + 2) * (blen + 1) * sizeof(struct _dp),
-		vec::SIZE);
-	struct _dp *ptr = mat, *prev = mat + roundup(alen, vec::LEN) / vec::LEN;
+	// struct _dp *mat = (struct _dp *)aligned_malloc(
+		// (roundup(alen + 1, vec::LEN) / vec::LEN + 2) * (blen + 1) * sizeof(struct _dp),
+		// vec::SIZE);
+	struct _dp *ptr = (struct _dp *)work, *prev = (struct _dp *)work + roundup(alen, vec::LEN) / vec::LEN;
 	// memset(mat, 0, roundup(alen, vec::LEN) / vec::LEN * roundup(blen, vec::LEN) * sizeof(struct _dp));
 
 	debug("%llu, %llu, %llu, %llu, %lu", alen, roundup((alen + 1), vec::LEN), roundup((alen + 1), vec::LEN) / vec::LEN + 1, blen, sizeof(struct _dp));
@@ -356,7 +358,7 @@ simdblast_affine(
 */
 		best_score_v.set(best_temp_v.hmax());
 	}
-	free(mat);
+	// free(mat);
 
 	return(best_score_v.hmax() - OFS);
 }
@@ -379,8 +381,12 @@ int main_ext(int argc, char *argv[])
 	int8_t score_matrix[16] __attribute__(( aligned(16) ));
 	build_score_matrix(score_matrix, atoi(argv[4]), atoi(argv[5]));
 
+
+	void *work = aligned_malloc(128 * 1024 * 1024, 16);
+
 	if(strcmp(argv[1], "linear") == 0) {
 		int score = simdblast_linear(
+			work,
 			a, alen, b, blen,
 			score_matrix,
 			atoi(argv[6]),
@@ -388,6 +394,7 @@ int main_ext(int argc, char *argv[])
 		printf("%d\n", score);
 	} else if(strcmp(argv[1], "affine") == 0) {
 		int score = simdblast_affine(
+			work,
 			a, alen, b, blen,
 			score_matrix,
 			atoi(argv[6]),
@@ -398,7 +405,7 @@ int main_ext(int argc, char *argv[])
 		printf("./a.out linear AAA AAA 2 -3 -5 -1 30\n");
 	}
 
-	free(a); free(b);
+	free(a); free(b); free(work);
 	return(0);
 }
 
@@ -414,8 +421,11 @@ int main(int argc, char *argv[])
 	int8_t score_matrix[16] __attribute__(( aligned(16) ));
 	build_score_matrix(score_matrix, 1, -1);
 
+
+	void *work = aligned_malloc(128 * 1024 * 1024, 16);
+
 	#define l(s, p, q) { \
-		assert(simdblast_linear(p, strlen(p), q, strlen(q), score_matrix, -1, 10) == (s)); \
+		assert(simdblast_linear(work, p, strlen(p), q, strlen(q), score_matrix, -1, 10) == (s)); \
 	}
 	l( 0, "", "");
 	l( 0, "A", "");
@@ -429,7 +439,7 @@ int main(int argc, char *argv[])
 
 
 	#define a(s, p, q) { \
-		assert(simdblast_affine(p, strlen(p), q, strlen(q), score_matrix, -1, -1, 10) == (s)); \
+		assert(simdblast_affine(work, p, strlen(p), q, strlen(q), score_matrix, -1, -1, 10) == (s)); \
 	}
 	a( 0, "", "");
 	a( 0, "A", "");
@@ -441,12 +451,13 @@ int main(int argc, char *argv[])
 	a( 4, "AAACAAAGGG", "AAAAAATTTTTTT");
 	a( 3, "AAACCAAAGGG", "AAAAAATTTTTTT");
 
-	int sl = simdblast_linear(a, strlen(a), b, strlen(b), score_matrix, -1, 30);
+	int sl = simdblast_linear(work, a, strlen(a), b, strlen(b), score_matrix, -1, 30);
 	printf("%d\n", sl);
 
-	int sa = simdblast_affine(a, strlen(a), b, strlen(b), score_matrix, -1, -1, 30);
+	int sa = simdblast_affine(work, a, strlen(a), b, strlen(b), score_matrix, -1, -1, 30);
 	printf("%d\n", sa);
 
+	free(work);
 	return(0);
 }
 #endif

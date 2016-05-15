@@ -21,6 +21,7 @@
  */
 int
 ddiag_linear(
+	void *work,
 	char const *a,
 	uint64_t alen,
 	char const *b,
@@ -31,10 +32,10 @@ ddiag_linear(
 	if(alen == 0 || blen == 0) { return(0); }
 	debug("%s, %s", a, b);
 
-	uint16_t *mat = (uint16_t *)aligned_malloc(
-		(alen+blen-1) * BW * sizeof(uint16_t),
-		sizeof(__m128i));
-	uint16_t *ptr = mat;
+	// uint16_t *mat = (uint16_t *)aligned_malloc(
+		// (alen+blen-1) * BW * sizeof(uint16_t),
+		// sizeof(__m128i));
+	uint16_t *ptr = (uint16_t *)work;
 
 	/* extract max and min */
 	int8_t sc_max = extract_max_score(score_matrix);
@@ -238,7 +239,7 @@ ddiag_linear(
 
 		if(w.cv[BW/2] < w.max[BW/2] - xt) { break; }
 	}
-	free(mat);
+	// free(mat);
 
 	int32_t max = 0;
 	for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
@@ -254,6 +255,7 @@ ddiag_linear(
  */
 int
 ddiag_affine(
+	void *work,
 	char const *a,
 	uint64_t alen,
 	char const *b,
@@ -264,10 +266,10 @@ ddiag_affine(
 	if(alen == 0 || blen == 0) { return(0); }
 	debug("%s, %s", a, b);
 
-	uint16_t *mat = (uint16_t *)aligned_malloc(
-		(alen+blen-1) * 3 * BW * sizeof(uint16_t),
-		sizeof(__m128i));
-	uint16_t *ptr = mat;
+	// uint16_t *mat = (uint16_t *)aligned_malloc(
+		// (alen+blen-1) * 3 * BW * sizeof(uint16_t),
+		// sizeof(__m128i));
+	uint16_t *ptr = (uint16_t *)work;
 
 	/* extract max and min */
 	int8_t sc_max = extract_max_score(score_matrix);
@@ -542,7 +544,7 @@ ddiag_affine(
 
 		if(w.cv[BW/2] < w.max[BW/2] - xt) { break; }
 	}
-	free(mat);
+	// free(mat);
 
 	int32_t max = 0;
 	for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
@@ -571,8 +573,12 @@ int main_ext(int argc, char *argv[])
 	int8_t score_matrix[16] __attribute__(( aligned(16) ));
 	build_score_matrix(score_matrix, atoi(argv[4]), atoi(argv[5]));
 
+
+	void *work = aligned_malloc(128 * 1024 * 1024, 16);
+
 	if(strcmp(argv[1], "linear") == 0) {
 		int score = ddiag_linear(
+			work,
 			a, alen, b, blen,
 			score_matrix,
 			atoi(argv[6]),
@@ -580,6 +586,7 @@ int main_ext(int argc, char *argv[])
 		printf("%d\n", score);
 	} else if(strcmp(argv[1], "affine") == 0) {
 		int score = ddiag_affine(
+			work,
 			a, alen, b, blen,
 			score_matrix,
 			atoi(argv[6]),
@@ -590,7 +597,7 @@ int main_ext(int argc, char *argv[])
 		printf("./a.out linear AAA AAA 2 -3 -5 -1 30\n");
 	}
 
-	free(a); free(b);
+	free(a); free(b); free(work);
 	return(0);
 }
 
@@ -606,8 +613,10 @@ int main(int argc, char *argv[])
 	int8_t score_matrix[16] __attribute__(( aligned(16) ));
 	build_score_matrix(score_matrix, 1, -1);
 
+	void *work = aligned_malloc(128 * 1024 * 1024, 16);
+
 	#define l(s, p, q) { \
-		assert(ddiag_linear(p, strlen(p), q, strlen(q), score_matrix, -1, 10) == (s)); \
+		assert(ddiag_linear(work, p, strlen(p), q, strlen(q), score_matrix, -1, 10) == (s)); \
 	}
 	l( 0, "", "");
 	l( 0, "A", "");
@@ -620,7 +629,7 @@ int main(int argc, char *argv[])
 	l( 4, "AAACCAAAGGG", "AAAAAATTTTTTT");
 
 	#define a(s, p, q) { \
-		assert(ddiag_affine(p, strlen(p), q, strlen(q), score_matrix, -1, -1, 10) == (s)); \
+		assert(ddiag_affine(work, p, strlen(p), q, strlen(q), score_matrix, -1, -1, 10) == (s)); \
 	}
 	a( 0, "", "");
 	a( 0, "A", "");
@@ -632,12 +641,14 @@ int main(int argc, char *argv[])
 	a( 4, "AAACAAAGGG", "AAAAAATTTTTTT");
 	a( 3, "AAACCAAAGGG", "AAAAAATTTTTTT");
 
-	int sl = ddiag_linear(a, strlen(a), b, strlen(b), score_matrix, -1, 30);
+	int sl = ddiag_linear(work, a, strlen(a), b, strlen(b), score_matrix, -1, 30);
 	printf("%d\n", sl);
 
-	int sa = ddiag_affine(a, strlen(a), b, strlen(b), score_matrix, -1, -1, 30);
+	int sa = ddiag_affine(work, a, strlen(a), b, strlen(b), score_matrix, -1, -1, 30);
 	printf("%d\n", sa);
 
+
+	free(work);
 	return(0);
 }
 #endif

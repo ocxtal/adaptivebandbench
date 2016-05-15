@@ -15,6 +15,7 @@
  */
 int
 blast_linear(
+	void *work,
 	char const *a,
 	uint64_t alen,
 	char const *b,
@@ -28,8 +29,8 @@ blast_linear(
 	uint64_t i, a_size, first_a_index, last_a_index, a_index, b_index;
 	int16_t best_score, score, next_score, score_gap_row, score_gap_col;
 
-	int16_t *mat = (int16_t *)malloc((alen + 2) * (blen + 1) * sizeof(int16_t));
-	int16_t *ptr = mat, *prev;
+	// int16_t *mat = (int16_t *)malloc((alen + 2) * (blen + 1) * sizeof(int16_t));
+	int16_t *ptr = (int16_t *)work, *prev;
 
 	/* initialize top row */
 	ptr[0] = (score = 0);
@@ -101,7 +102,7 @@ blast_linear(
 			ptr[a_size] = MIN; a_size++;
 		}
 	}
-	free(mat);
+	// free(mat);
 
 	debug("%d", best_score);
 	return(best_score);
@@ -112,6 +113,7 @@ blast_linear(
  */
 int
 blast_affine(
+	void *work,
 	char const *a,
 	uint64_t alen,
 	char const *b,
@@ -129,8 +131,8 @@ blast_affine(
 		int16_t best;
 		int16_t best_gap;
 	};
-	struct _dp *mat = (struct _dp *)malloc((alen + 2) * (blen + 1) * sizeof(struct _dp));
-	struct _dp *ptr = mat, *prev;
+	// struct _dp *mat = (struct _dp *)malloc((alen + 2) * (blen + 1) * sizeof(struct _dp));
+	struct _dp *ptr = (struct _dp *)work, *prev;
 
 	/* initialize top row */
 	ptr[0].best = (score = 0); ptr[0].best_gap = gi;
@@ -217,7 +219,7 @@ blast_affine(
 			a_size++;
 		}
 	}
-	free(mat);
+	// free(mat);
 
 	return(best_score);
 }
@@ -235,8 +237,11 @@ int main_ext(int argc, char *argv[])
 	int8_t score_matrix[16] __attribute__(( aligned(16) ));
 	build_score_matrix(score_matrix, atoi(argv[4]), atoi(argv[5]));
 
+	void *work = aligned_malloc(128 * 1024 * 1024, 16);
+
 	if(strcmp(argv[1], "linear") == 0) {
 		int score = blast_linear(
+			work,
 			a, alen, b, blen,
 			score_matrix,
 			atoi(argv[6]),
@@ -244,6 +249,7 @@ int main_ext(int argc, char *argv[])
 		printf("%d\n", score);
 	} else if(strcmp(argv[1], "affine") == 0) {
 		int score = blast_affine(
+			work,
 			a, alen, b, blen,
 			score_matrix,
 			atoi(argv[6]),
@@ -253,6 +259,8 @@ int main_ext(int argc, char *argv[])
 	} else {
 		printf("./a.out linear AAA AAA 2 -3 -5 -1 30\n");
 	}
+
+	free(work);
 	return(0);
 }
 
@@ -268,8 +276,11 @@ int main(int argc, char *argv[])
 	int8_t score_matrix[16] __attribute__(( aligned(16) ));
 	build_score_matrix(score_matrix, 1, -1);
 
+
+	void *work = aligned_malloc(128 * 1024 * 1024, 16);
+
 	#define l(s, p, q) { \
-		assert(blast_linear(p, strlen(p), q, strlen(q), score_matrix, -1, 10) == (s)); \
+		assert(blast_linear(work, p, strlen(p), q, strlen(q), score_matrix, -1, 10) == (s)); \
 	}
 	l( 0, "", "");
 	l( 0, "A", "");
@@ -282,7 +293,7 @@ int main(int argc, char *argv[])
 	l( 4, "AAACCAAAGGG", "AAAAAATTTTTTT");
 
 	#define a(s, p, q) { \
-		assert(blast_affine(p, strlen(p), q, strlen(q), score_matrix, -1, -1, 10) == (s)); \
+		assert(blast_affine(work, p, strlen(p), q, strlen(q), score_matrix, -1, -1, 10) == (s)); \
 	}
 	a( 0, "", "");
 	a( 0, "A", "");
@@ -294,12 +305,13 @@ int main(int argc, char *argv[])
 	a( 4, "AAACAAAGGG", "AAAAAATTTTTTT");
 	a( 3, "AAACCAAAGGG", "AAAAAATTTTTTT");
 
-	int sl = blast_linear(a, strlen(a), b, strlen(b), score_matrix, -1, 30);
+	int sl = blast_linear(work, a, strlen(a), b, strlen(b), score_matrix, -1, 30);
 	printf("%d\n", sl);
 
-	int sa = blast_affine(a, strlen(a), b, strlen(b), score_matrix, -1, -1, 30);
+	int sa = blast_affine(work, a, strlen(a), b, strlen(b), score_matrix, -1, -1, 30);
 	printf("%d\n", sa);
 
+	free(work);
 	return(0);
 }
 #endif
