@@ -113,7 +113,7 @@ def read_csv(filename):
 def plot_calc_time(in_file, out_file):
 	
 	lengths = [100, 150, 250, 350, 500, 650, 800, 1000, 1500, 2500, 3500, 5000, 6500, 8000, 10000]
-	variants = ['BLAST', 'BLAST (SIMD)', 'Adaptive (32)', 'Wavefront']
+	variants = ['BLAST', 'BLAST (SIMD)', 'Adaptive (32)']
 
 	# clear figure
 	plt.clf()
