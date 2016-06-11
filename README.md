@@ -56,9 +56,9 @@ Figure 2. Results of the accuracy assessment
 
 Calculation time to report the maximum score is measured on the SIMD-parallelized implementation of the adaptive-banded algorithm and the BLAST gapped alignment routine. The result (Figure 3) revealed that the SSE4.1 adaptive banded implementation was 7 times faster than the BLAST DP on an Intel Ivy Bridge processor.
 
-Figure 3. Speed benchmark (sum of 1000 runs).
-
 ![fig3](https://github.com/ocxtal/adaptivebandbench/blob/master/fig/speedbench.png)
+
+Figure 3. Speed benchmark (sum of 1000 runs).
 
 ## Running scripts
 
