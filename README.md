@@ -9,7 +9,7 @@ This repository contains benchmarking (recall benchmark and speed benchmark) pro
 
 The adaptive-banded algorithm is a fast matrix calculation algorithm for the nucleotide sequence alignments. It is a modification of the conventional banded DP, found in the original implementation of the MOSAIK aligner, the BWA-MEM aligner, and the SeqAn library, making the advancing direction of the band determined adaptively. The advancing direction, right or down, is selected on every vector update, comparing the two cells on the upper and lower edges of the band (see Figure 1(a) below). This method keeps the two cells on the both edges balanced, resulting in capturing the cell with maximum score around the center of the band.
 
-![fig1](https://github.com/ocxtal/adaptivebandbench/blob/master/fig/adaptiveband.png)
+<img src="https://github.com/ocxtal/adaptivebandbench/blob/master/fig/adaptiveband.png">
 
 Figure 1. (a) Vector placement of the band. (b) Vectorized update operation of the affine-gap penalty (Gotoh) algorithm.
 
@@ -48,7 +48,7 @@ The probability of band deviation may increase when the query sequence length ge
 
 The algorithm fundamentally drops alignment paths with large insertions and deletions. The longest acceptable indel lengths are evaluated in this experiment. A set of sequence pairs with its indentity 0.85 and length 1000, and insertion of various lengths is given to the algorithm. The result (Fig. 2(e)) shows that the algortihm is able to recover optimal alignment when the insertion length is less than W - 4.
 
-![fig2](https://github.com/ocxtal/adaptivebandbench/blob/master/fig/sensitivitybench.png)
+<img src="https://github.com/ocxtal/adaptivebandbench/blob/master/fig/sensitivitybench.png">
 
 Figure 2. Results of the accuracy assessment
 
@@ -56,7 +56,7 @@ Figure 2. Results of the accuracy assessment
 
 Calculation time to report the maximum score is measured on the SIMD-parallelized implementation of the adaptive-banded algorithm and the BLAST gapped alignment routine. The result (Figure 3) revealed that the SSE4.1 adaptive banded implementation was 7 times faster than the BLAST DP on an Intel Ivy Bridge processor.
 
-![fig3](https://github.com/ocxtal/adaptivebandbench/blob/master/fig/speedbench.png)
+<img src="https://github.com/ocxtal/adaptivebandbench/blob/master/fig/speedbench.png" width="400">
 
 Figure 3. Speed benchmark (sum of 1000 runs).
 
