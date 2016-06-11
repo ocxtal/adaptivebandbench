@@ -48,7 +48,7 @@ The probability of band deviation may increase when the query sequence length ge
 
 The algorithm fundamentally drops alignment paths with large insertions and deletions. The longest acceptable indel lengths are evaluated in this experiment. A set of sequence pairs with its indentity 0.85 and length 1000, and insertion of various lengths is given to the algorithm. The result (Fig. 2(e)) shows that the algortihm is able to recover optimal alignment when the insertion length is less than W - 4.
 
-![fig2](https://github.com/ocxtal/adaptivebandbench/blob/master/fig/sesitivitybench.png)
+![fig2](https://github.com/ocxtal/adaptivebandbench/blob/master/fig/sensitivitybench.png)
 
 Figure 2. Results of the accuracy assessment
 
