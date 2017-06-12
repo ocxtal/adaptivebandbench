@@ -339,18 +339,30 @@ int main(int argc, char *argv[])
 	} else {
 		int c;
 		kvec_t(char) buf;
-		kvec_t(char*) seq;
+		kvec_t(char *) seq;
 		kvec_t(uint64_t) len;
+
+		kv_init(buf);
+		kv_init(seq);
+		kv_init(len);
+
 		uint64_t base = 0;
 		while((c = getchar()) != EOF) {
 			if(c == '\n') {
 				kv_push(len, kv_size(buf) - base);
-				kv_push(seq, (char*)base);
+				kv_push(seq, (char *)base);
 				kv_push(buf, '\0');
 				base = kv_size(buf);
 			} else {
 				kv_push(buf, c);
 			}
+		}
+		kv_push(len, kv_size(buf) - base);
+		kv_push(seq, (char *)base);
+		kv_push(buf, '\0');
+
+		for(i = 0; i < kv_size(seq); i++) {
+			kv_at(seq, i) += (ptrdiff_t)buf.a;
 		}
 
 		/* blast */
