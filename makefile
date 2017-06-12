@@ -1,7 +1,7 @@
 
 CC=gcc
 CXX=g++
-CFLAGS=-Wall -O3 -msse4.1
+CFLAGS=-Wall -O3 -march=native
 
 
 all: recall bench
