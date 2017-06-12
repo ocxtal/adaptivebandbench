@@ -11,7 +11,7 @@
 #include "full.h"
 #include "kvec.h"
 #include "bench.h"
-
+#include "ssw.h"
 
 int blast_linear(
 	void *work,
@@ -94,7 +94,7 @@ struct wavefront_work_s *wavefront_init_work(void)
 
 
 	float freq[4] = { 0.25, 0.25, 0.25, 0.25 };
-	Align_Spec *s = New_Align_Spec(0.7, 100, freq);
+	Align_Spec *s = New_Align_Spec(0.6, 100, freq);
 
 
 	work->w = w;
@@ -144,6 +144,7 @@ wavefront(
 	int high = 0;
 
 	forward_wave(w, s, &aln, &work->bpath, &low, high, 0, -INT32_MAX, INT32_MAX);
+	// fprintf(stderr, "(%u, %u), (%u, %u)\n", alen, blen, aln.path->aepos, aln.path->bepos);
 	return(0);
 }
 
@@ -232,12 +233,12 @@ int main(int argc, char *argv[])
 		argc--; argv++;
 	}
 
-	int i;
+	uint64_t i;
 	int const m = 1, x = -1, gi = -1, ge = -1;
 	int const xt = 30;
 	char *a, *b, *at, *bt;
-	bench_t bl, ba, sl, sa, ddl, dda, wl;
-	volatile int64_t sbl = 0, sba = 0, ssl = 0, ssa = 0, sddl = 0, sdda = 0;
+	bench_t bl, ba, sl, sa, ddl, dda, wl, fa;
+	volatile int64_t sbl = 0, sba = 0, ssl = 0, ssa = 0, sddl = 0, sdda = 0, sfa = 0;
 	struct timeval tv;
 
 	int8_t score_matrix[16] __attribute__(( aligned(16) ));
@@ -251,9 +252,9 @@ int main(int argc, char *argv[])
 	/* malloc work */
 	void *work = aligned_malloc(1024 * 1024 * 1024, sizeof(__m128i));
 
-	if(strcmp(argv[1], "-") != 0) {
-		int len = (argc > 1) ? atoi(argv[1]) : 1000;
-		int cnt = (argc > 2) ? atoi(argv[2]) : 1000;
+	if(argc > 1 && strcmp(argv[1], "-") != 0) {
+		uint64_t len = (argc > 1) ? atoi(argv[1]) : 1000;
+		uint64_t cnt = (argc > 2) ? atoi(argv[2]) : 1000;
 		a = rseq(len * 9 / 10);
 		b = mseq(a, 10, 40, 40);
 		at = rseq(len / 10);
@@ -338,6 +339,9 @@ int main(int argc, char *argv[])
 
 	} else {
 		int c;
+		double frac = (argc > 2) ? atof(argv[2]) : 1.0;
+		uint64_t const rl = 100;
+
 		kvec_t(char) buf;
 		kvec_t(char *) seq;
 		kvec_t(uint64_t) len;
@@ -349,8 +353,13 @@ int main(int argc, char *argv[])
 		uint64_t base = 0;
 		while((c = getchar()) != EOF) {
 			if(c == '\n') {
-				kv_push(len, kv_size(buf) - base);
+				uint64_t l = (uint64_t)(frac * (kv_size(buf) - base));
+				for(i = 0; i < rl; i++) {
+					kv_push(buf, rbase());
+				}
+				kv_push(len, l + rl);
 				kv_push(seq, (char *)base);
+				buf.n = base + l + rl;
 				kv_push(buf, '\0');
 				base = kv_size(buf);
 			} else {
@@ -422,10 +431,35 @@ int main(int argc, char *argv[])
 		bench_end(wl);
 		print_bench(flag, "wavefront", bench_get(wl), bench_get(wl), 0, 0);
 
+		/* SSW library */
+		/* convert sequence to number string */
+		for(i = 0; i < kv_size(buf); i++) {
+			if(kv_at(buf, i) == '\0') { continue; }
+			char c = kv_at(buf, i);
+			kv_at(buf, i) = (((c>>2) ^ (c>>1)) & 0x03) + 1;
+		}
+
+		bench_init(fa);
+		for(i = 0; i < kv_size(seq) / 2; i++) {
+			s_profile *sp = ssw_init((int8_t *)kv_at(seq, i * 2), kv_at(len, i * 2), score_matrix, 4, 1);
+
+			bench_start(fa);
+			s_align *r = ssw_align(sp, (int8_t *)kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), -gi, -ge, 8, 0, 0, 30);
+			bench_end(fa);
+
+			sfa += r->score1;
+			align_destroy(r);
+			init_destroy(sp);
+		}
+		print_bench(flag, "farrar", bench_get(fa), bench_get(fa), sfa, 0);
 
 		if(flag != 0) {
 			printf("\n");
 		}
+
+		kv_destroy(buf);
+		kv_destroy(seq);
+		kv_destroy(len);
 	}
 
 	free(work);

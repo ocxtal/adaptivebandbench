@@ -15,6 +15,7 @@ bench:
 	$(CC) $(CFLAGS) -c -o wave/DB.o wave/DB.c
 	$(CC) $(CFLAGS) -c -o wave/QV.o wave/QV.c
 	$(CC) $(CFLAGS) -c -o wave/align.o wave/align.c
-	$(CXX) $(CFLAGS) -o bin/bench main.cc aband.cc blast.cc simdblast.cc wave/DB.o wave/QV.o wave/align.o -DBENCH -DBW=32
+	$(CC) $(CFLAGS) -c -o ssw.o ssw.c
+	$(CXX) $(CFLAGS) -o bin/bench main.cc aband.cc blast.cc simdblast.cc wave/DB.o wave/QV.o wave/align.o ssw.o -DBENCH -DBW=32
 
 
