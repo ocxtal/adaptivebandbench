@@ -12,6 +12,7 @@
 #include "bench.h"
 #include <stdio.h>
 #include <stdint.h>				/** uint32_t, uint64_t, ... */
+#include <stdlib.h>
 #include <stddef.h>				/** offsetof */
 #include <string.h>				/** memset, memcpy */
 #include <smmintrin.h>
