@@ -1,9 +1,68 @@
-# Benchmarking on adaptive banded DP
-
-This repository contains bencmarking (recall benchmark and speed benchmark) scripts used in the adaptive banded paper. If you are thinking of porting (or implementing) adaptive banded algorithm to your program, you should consider using [GABA library](https://github.com/ocxtal/libgaba) that implements the algorithm with another acceleration algorithm (it is much faster and much more stable).
+# Assessment on Adaptive-Banded Dynamic Programming algorithm for the nucleotide semi-global alignment
 
 
-## Contents
+
+This repository contains benchmarking (recall benchmark and speed benchmark) programs and scripts of the adaptive-banded semi-global alignment algorithm. If you are thinking of porting (or implementing) adaptive banded algorithm to your program, you should consider using [GABA library](https://github.com/ocxtal/libgaba) that implements the algorithm with another acceleration algorithm (it is much faster and much more stable).
+
+
+## Overview of the Adaptive-Banded algorithm
+
+The adaptive-banded algorithm is a fast matrix calculation algorithm for the nucleotide sequence alignments. It is a modification of the conventional banded DP, found in the original implementation of the MOSAIK aligner, the BWA-MEM aligner, and the SeqAn library, making the advancing direction of the band determined adaptively. The advancing direction, right or down, is selected on every vector update, comparing the two cells on the upper and lower edges of the band (see Figure 1(a) below). This method keeps the two cells on the both edges balanced, resulting in capturing the cell with maximum score around the center of the band.
+
+<img src="https://github.com/ocxtal/adaptivebandbench/blob/master/fig/adaptiveband.png">
+
+Figure 1. (a) Vector placement of the band. (b) Vectorized update operation of the affine-gap penalty (Gotoh) algorithm.
+
+### Relation to the semi-global DP routine in the BLAST package
+
+The adaptive-banded algorithm is similar to the semi-global DP routine found in the NCBI BLAST+ package (the gapped alignment phase) in that the algorithm determines the area of the shrinked matrix on the way to calculate it. The difference is that the band width (W in the figure above) is fixed to some constant in the adaptive banded algorithm. The termination of the extension is detected with a X-drop-like test, comparing the center cell of the vector at the head and the maximum score of the center cells of the previous vectors.
+
+
+### SIMD parallelization
+
+In the adaptive banded algorithm, vectors are placed parallel to the anti-diagonal line of the matrix. The cells having no mutual dependencies and the width of vectors fixed to a constant, the algorithm can be parallelized with Single-Instruction-Multiple-Data (SIMD) operations. The prototype implementation in this repository adopts the SSE4.1 instructions on the x86\_64 processors, calculating eight of 16-bit cells simultaneously. The figure (b) shows the parallelized vector update operation of the affine-gap cost algorithm.
+
+
+
+## Assessment of sensitivity
+
+In order to confirm the algorithm reports the optimal scores (and corresponding paths, not tested this time) of the original semi-global alignment algorithm, four experiments are performed.
+
+
+### Effect of band width
+
+To assess necessary band width, a set of sequence pairs with its mean identity 0.85 and mean length 1000 are given to the algorithm (Figure 2(b)). Reported scores are compared to the result of the naive implementation of the semi-global alignment algorithm. Sum of 1000 trials are shown in the heatmap as [0, 1] normalized recall. The sequence set is generated with [PBSIM](http://bioinformatics.oxfordjournals.org/content/29/1/119.full) read simulator (Figure 2(a)).
+
+
+### Effect of gap penalties
+
+To assess the performance of the band steering mechanism of the algorithm, recall rates with various gap open and extension penalties are measured. The result shows that the low gap extension penalties, which may cause disappearance of the gradient of scores in vectors, tends to degrade the recall rates (Figure 2(c): the bottom rows of the heatmap).
+
+
+### Effect of query sequence lengths
+
+The probability of band deviation may increase when the query sequence length gets long. The effect of the length is measured in this experiment, varing the band width 16 and 32. The result (Fig. 2(d)) shows that the 32-cell wide implementation sucessfully captures the optimal scores regardless of the lengths. The 16-cell band is not wide enough to capture long sequences (but applicable to short sequences like Illumina).
+
+
+### Indel tolerance
+
+The algorithm fundamentally drops alignment paths with large insertions and deletions. The longest acceptable indel lengths are evaluated in this experiment. A set of sequence pairs with its indentity 0.85 and length 1000, and insertion of various lengths is given to the algorithm. The result (Fig. 2(e)) shows that the algortihm is able to recover optimal alignment when the insertion length is less than W - 4.
+
+<img src="https://github.com/ocxtal/adaptivebandbench/blob/master/fig/sensitivitybench.png">
+
+Figure 2. Results of the accuracy assessment
+
+## Speed benchmark
+
+Calculation time to report the maximum score is measured on the SIMD-parallelized implementation of the adaptive-banded algorithm and the BLAST gapped alignment routine. The result (Figure 3) revealed that the SSE4.1 adaptive banded implementation was 7 times faster than the BLAST DP on an Intel Ivy Bridge processor.
+
+<img src="https://github.com/ocxtal/adaptivebandbench/blob/master/fig/speedbench.png" width="400">
+
+Figure 3. Speed benchmark (sum of 1000 runs).
+
+## Running scripts
+
+### Contents
 
 Several algorithms calculating semi-global alignment and benchmarking scripts are included.
 
@@ -14,12 +73,9 @@ Several algorithms calculating semi-global alignment and benchmarking scripts ar
 * Myers' wavefront algorithm (with some heuristics, described in the DALIGNER paper), extracted from the [DALIGNER](https://github.com/thegenemyers/DALIGNER) repository.
 
 
-## Build
+### Build
 
 `make` will generate all the binaries needed in the benchmarks with gcc compiler.
-
-
-## Run benchmarks
 
 
 ### Recall benchmarks

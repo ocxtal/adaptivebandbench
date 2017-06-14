@@ -9,7 +9,7 @@
 #include <sys/time.h>
 #include "util.h"
 #include "full.h"
-
+#include "kvec.h"
 #include "bench.h"
 
 
@@ -236,8 +236,6 @@ int main(int argc, char *argv[])
 	int const m = 1, x = -1, gi = -1, ge = -1;
 	int const xt = 30;
 	char *a, *b, *at, *bt;
-	int len = (argc > 1) ? atoi(argv[1]) : 1000;
-	int cnt = (argc > 2) ? atoi(argv[2]) : 1000;
 	bench_t bl, ba, sl, sa, ddl, dda, wl;
 	volatile int64_t sbl = 0, sba = 0, ssl = 0, ssa = 0, sddl = 0, sdda = 0;
 	struct timeval tv;
@@ -250,96 +248,175 @@ int main(int argc, char *argv[])
 	srand(s);
 	print_msg(flag, "%lu\n", s);
 
-	a = rseq(len * 9 / 10);
-	b = mseq(a, 10, 40, 40);
-	at = rseq(len / 10);
-	bt = rseq(len / 10);
-	a = (char *)realloc(a, 2*len); strcat(a, at); free(at);
-	b = (char *)realloc(b, 2*len); strcat(b, bt); free(bt);
-	print_msg(flag, "%p, %p\n", a, b);
-
-	// print_msg(flag, "%s\n%s\n", a, b);
-
-	print_msg(flag, "len:\t%d\ncnt:\t%d\n", len, cnt);
-	print_msg(flag, "m: %d\tx: %d\tgi: %d\tge: %d\n", m, x, gi, ge);
-	print_msg(flag, "alg\tlinear\taffine\tsc(l)\tsc(a)\n");
-
-
 	/* malloc work */
 	void *work = aligned_malloc(1024 * 1024 * 1024, sizeof(__m128i));
 
+	if(strcmp(argv[1], "-") != 0) {
+		int len = (argc > 1) ? atoi(argv[1]) : 1000;
+		int cnt = (argc > 2) ? atoi(argv[2]) : 1000;
+		a = rseq(len * 9 / 10);
+		b = mseq(a, 10, 40, 40);
+		at = rseq(len / 10);
+		bt = rseq(len / 10);
+		a = (char *)realloc(a, 2*len); strcat(a, at); free(at);
+		b = (char *)realloc(b, 2*len); strcat(b, bt); free(bt);
+		print_msg(flag, "%p, %p\n", a, b);
 
-	/* blast */
-	bench_init(bl);
-	bench_init(ba);
-	bench_start(bl);
-	for(i = 0; i < cnt; i++) {
-		sbl += blast_linear(work, a, strlen(a), b, strlen(b), score_matrix, ge, xt);
-	}
-	bench_end(bl);
-	bench_start(ba);
-	for(i = 0; i < cnt; i++) {
-		sba += blast_affine(work, a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
-	}
-	bench_end(ba);
-	print_bench(flag, "blast", bench_get(bl), bench_get(ba), sbl, sba);
+		// print_msg(flag, "%s\n%s\n", a, b);
 
-	/* simdblast */
-	bench_init(sl);
-	bench_init(sa);
-	bench_start(sl);
-	for(i = 0; i < cnt; i++) {
-		ssl += simdblast_linear(work, a, strlen(a), b, strlen(b), score_matrix, ge, xt);
-	}
-	bench_end(sl);
-	bench_start(sa);
-	for(i = 0; i < cnt; i++) {
-		ssa += simdblast_affine(work, a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
-	}
-	bench_end(sa);
-	print_bench(flag, "simdblast", bench_get(sl), bench_get(sa), ssl, ssa);
+		print_msg(flag, "len:\t%d\ncnt:\t%d\n", len, cnt);
+		print_msg(flag, "m: %d\tx: %d\tgi: %d\tge: %d\n", m, x, gi, ge);
+		print_msg(flag, "alg\tlinear\taffine\tsc(l)\tsc(a)\n");
 
+		/* blast */
+		bench_init(bl);
+		bench_init(ba);
+		bench_start(bl);
+		for(i = 0; i < cnt; i++) {
+			sbl += blast_linear(work, a, strlen(a), b, strlen(b), score_matrix, ge, xt);
+		}
+		bench_end(bl);
+		bench_start(ba);
+		for(i = 0; i < cnt; i++) {
+			sba += blast_affine(work, a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
+		}
+		bench_end(ba);
+		print_bench(flag, "blast", bench_get(bl), bench_get(ba), sbl, sba);
 
-	/* adaptive banded */
-	bench_init(ddl);
-	bench_init(dda);
-	bench_start(ddl);
-	for(i = 0; i < cnt; i++) {
-		sddl += ddiag_linear(work, a, strlen(a), b, strlen(b), score_matrix, ge, xt);
-	}
-	bench_end(ddl);
-	bench_start(dda);
-	for(i = 0; i < cnt; i++) {
-		sdda += ddiag_affine(work, a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
-	}
-	bench_end(dda);
-	print_bench(flag, "aband", bench_get(ddl), bench_get(dda), sddl, sdda);
-
-
-	free(work);
+		/* simdblast */
+		bench_init(sl);
+		bench_init(sa);
+		bench_start(sl);
+		for(i = 0; i < cnt; i++) {
+			ssl += simdblast_linear(work, a, strlen(a), b, strlen(b), score_matrix, ge, xt);
+		}
+		bench_end(sl);
+		bench_start(sa);
+		for(i = 0; i < cnt; i++) {
+			ssa += simdblast_affine(work, a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
+		}
+		bench_end(sa);
+		print_bench(flag, "simdblast", bench_get(sl), bench_get(sa), ssl, ssa);
 
 
-	/* wavefront */
-	bench_init(wl);
-	if(len >= 1000) {
-		/* wavefront algorithm fails to align sequences shorter than 1000 bases */
+		/* adaptive banded */
+		bench_init(ddl);
+		bench_init(dda);
+		bench_start(ddl);
+		for(i = 0; i < cnt; i++) {
+			sddl += ddiag_linear(work, a, strlen(a), b, strlen(b), score_matrix, ge, xt);
+		}
+		bench_end(ddl);
+		bench_start(dda);
+		for(i = 0; i < cnt; i++) {
+			sdda += ddiag_affine(work, a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
+		}
+		bench_end(dda);
+		print_bench(flag, "aband", bench_get(ddl), bench_get(dda), sddl, sdda);
 
+		/* wavefront */
+		bench_init(wl);
+		if(len >= 1000) {
+			/* wavefront algorithm fails to align sequences shorter than 1000 bases */
+
+			struct wavefront_work_s *wwork = wavefront_init_work();
+
+			bench_start(wl);
+			for(i = 0; i < cnt; i++) {
+				wavefront(wwork, a, strlen(a), b, strlen(b));
+			}
+			bench_end(wl);
+		}
+		print_bench(flag, "wavefront", bench_get(wl), bench_get(wl), 0, 0);
+
+
+		if(flag != 0) {
+			printf("\n");
+		}
+		free(a);
+		free(b);
+
+	} else {
+		int c;
+		kvec_t(char) buf;
+		kvec_t(char*) seq;
+		kvec_t(uint64_t) len;
+		uint64_t base = 0;
+		while((c = getchar()) != EOF) {
+			if(c == '\n') {
+				kv_push(len, kv_size(buf) - base);
+				kv_push(seq, (char*)base);
+				kv_push(buf, '\0');
+				base = kv_size(buf);
+			} else {
+				kv_push(buf, c);
+			}
+		}
+
+		/* blast */
+		bench_init(bl);
+		bench_init(ba);
+		bench_start(bl);
+		for(i = 0; i < kv_size(seq) / 2; i++) {
+			sbl += blast_linear(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, ge, xt);
+		}
+		bench_end(bl);
+		bench_start(ba);
+		for(i = 0; i < kv_size(seq) / 2; i++) {
+			sba += blast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
+		}
+		bench_end(ba);
+		print_bench(flag, "blast", bench_get(bl), bench_get(ba), sbl, sba);
+
+		/* simdblast */
+		bench_init(sl);
+		bench_init(sa);
+		bench_start(sl);
+		for(i = 0; i < kv_size(seq) / 2; i++) {
+			ssl += simdblast_linear(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, ge, xt);
+		}
+		bench_end(sl);
+		bench_start(sa);
+		for(i = 0; i < kv_size(seq) / 2; i++) {
+			ssa += simdblast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
+		}
+		bench_end(sa);
+		print_bench(flag, "simdblast", bench_get(sl), bench_get(sa), ssl, ssa);
+
+
+		/* adaptive banded */
+		bench_init(ddl);
+		bench_init(dda);
+		bench_start(ddl);
+		for(i = 0; i < kv_size(seq) / 2; i++) {
+			sddl += ddiag_linear(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, ge, xt);
+		}
+		bench_end(ddl);
+		bench_start(dda);
+		for(i = 0; i < kv_size(seq) / 2; i++) {
+			sdda += ddiag_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
+		}
+		bench_end(dda);
+		print_bench(flag, "aband", bench_get(ddl), bench_get(dda), sddl, sdda);
+
+		/* wavefront */
+		bench_init(wl);
 		struct wavefront_work_s *wwork = wavefront_init_work();
 
 		bench_start(wl);
-		for(i = 0; i < cnt; i++) {
-			wavefront(wwork, a, strlen(a), b, strlen(b));
+		for(i = 0; i < kv_size(seq) / 2; i++) {
+			wavefront(wwork, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1));
 		}
 		bench_end(wl);
-	}
-	print_bench(flag, "wavefront", bench_get(wl), bench_get(wl), 0, 0);
+		print_bench(flag, "wavefront", bench_get(wl), bench_get(wl), 0, 0);
 
 
-	if(flag != 0) {
-		printf("\n");
+		if(flag != 0) {
+			printf("\n");
+		}
 	}
-	free(a);
-	free(b);
+
+	free(work);
 	return 0;
 }
 
