@@ -213,11 +213,11 @@ int print_msg(int flag, char const *fmt, ...)
 int print_bench(int flag, char const *name, int64_t l, int64_t a, int64_t sl, int64_t sa)
 {
 	if(flag == 0) {
-		printf("%s\t%lld\t%lld\t%lld\t%lld\n", name, l / 1000, a / 1000, sl, sa);
+		return(printf("%s\t%lld\t%lld\t%lld\t%lld\n", name, l / 1000, a / 1000, sl, sa));
 	} else if(flag == 1) {
-		printf("%lld\t%lld\t", l / 1000, a / 1000);
+		return(printf("%lld\t%lld\t", l / 1000, a / 1000));
 	} else if(flag == 2) {
-		printf("%lld\t", a / 1000);
+		return(printf("%lld\t", a / 1000));
 	}
 	return(0);
 }

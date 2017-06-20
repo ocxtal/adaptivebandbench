@@ -266,8 +266,10 @@ def extract_labels(params_list, indices):
 		return(label + extract_labels(params_list[1:], indices[1:]))
 
 def score_identity(elems, comp_pair = [0, 1]):
-	try: return(sum([elem[comp_pair[0]][0] == elem[comp_pair[1]][0] for elem in elems]))
-	except TypeError: return('-')
+	try: return(sum([1 if elem[comp_pair[0]][0] == elem[comp_pair[1]][0] else 0 for elem in elems]))
+	except TypeError:
+		print('error')
+		return('-')
 
 def score_hist(elems, bin_size = 30, comp_pair = [0, 1]):
 	bin = [0 for i in range(bin_size)]
