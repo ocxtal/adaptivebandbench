@@ -2,7 +2,9 @@
 /**
  * @file main.cc
  */
+#define __STDC_LIMIT_MACROS
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
