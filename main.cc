@@ -339,7 +339,7 @@ int main(int argc, char *argv[])
 
 	} else {
 		int c;
-		uint64_t max_len = (argc > 2) ? atof(argv[2]) : 1.0;
+		uint64_t max_len = (argc > 2) ? atoi(argv[2]) : 10000;
 		uint64_t const rl = 100;
 
 		kvec_t(char) buf;
@@ -378,13 +378,17 @@ int main(int argc, char *argv[])
 		}
 
 		/* collect scores with full-sized dp */
+		kv_reserve(lscore, kv_size(seq) / 2);
+		kv_reserve(ascore, kv_size(seq) / 2);
+
+		#pragma omp parallel for
 		for(i = 0; i < kv_size(seq) / 2; i++) {
 			sw_result_t l = sw_linear(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, ge);
-			kv_push(lscore, l.score);
+			kv_at(lscore, i) = l.score;
 			free(l.path);
 
 			sw_result_t a = sw_affine(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge);
-			kv_push(ascore, a.score);
+			kv_at(ascore, i) = a.score;
 			free(a.path);
 		}
 
