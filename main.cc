@@ -449,13 +449,15 @@ int main(int argc, char *argv[])
 		/* wavefront */
 		bench_init(wl);
 		struct wavefront_work_s *wwork = wavefront_init_work();
-
-		bench_start(wl);
-		for(i = 0; i < kv_size(seq) / 2; i++) {
-			uint32_t l = wavefront(wwork, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1));
-			swl += l > 0.8 * (kv_at(len, i * 2) + kv_at(len, i * 2 + 1));
+		
+		if(max_len >= 100) {
+			bench_start(wl);
+			for(i = 0; i < kv_size(seq) / 2; i++) {
+				uint32_t l = wavefront(wwork, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1));
+				swl += l > 0.8 * (kv_at(len, i * 2) + kv_at(len, i * 2 + 1));
+			}
+			bench_end(wl);
 		}
-		bench_end(wl);
 		print_bench(flag, "wavefront", bench_get(wl), bench_get(wl), swl, 0);
 
 		/* SSW library */
