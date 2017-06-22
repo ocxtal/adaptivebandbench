@@ -1,7 +1,7 @@
 
 CC=gcc
 CXX=g++
-CFLAGS=-Wall -O3 -march=native
+CFLAGS=-Wall -O3 -march=native -fopenmp
 
 
 all: recall bench
@@ -17,6 +17,6 @@ bench:
 	$(CC) $(CFLAGS) -c -o wave/align.o wave/align.c
 	$(CC) $(CFLAGS) -c -o ssw.o ssw.c
 	$(CC) $(CFLAGS) -c -o full.o full.c
-	$(CXX) $(CFLAGS) -o bin/bench main.cc aband.cc blast.cc simdblast.cc wave/DB.o wave/QV.o wave/align.o ssw.o full.o -DBENCH -DBW=48
+	$(CXX) $(CFLAGS) -o bin/bench main.cc aband.cc blast.cc simdblast.cc wave/DB.o wave/QV.o wave/align.o ssw.o full.o -DBENCH -DBW=32
 
 
