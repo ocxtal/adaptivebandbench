@@ -145,7 +145,7 @@ wavefront(
 
 	forward_wave(w, s, &aln, &work->bpath, &low, high, 0, -INT32_MAX, INT32_MAX);
 	// fprintf(stderr, "(%u, %u), (%u, %u)\n", alen, blen, aln.path->aepos, aln.path->bepos);
-	return(0);
+	return(aln.path->aepos + aln.path->bepos);
 }
 
 
@@ -238,7 +238,7 @@ int main(int argc, char *argv[])
 	int const xt = 30;
 	char *a, *b, *at, *bt;
 	bench_t bl, ba, sl, sa, ddl, dda, wl, fa;
-	volatile int64_t sbl = 0, sba = 0, ssl = 0, ssa = 0, sddl = 0, sdda = 0, sfa = 0;
+	volatile int64_t sbl = 0, sba = 0, ssl = 0, ssa = 0, sddl = 0, sdda = 0, sfa = 0, swl = 0;
 	struct timeval tv;
 
 	int8_t score_matrix[16] __attribute__(( aligned(16) ));
@@ -339,7 +339,7 @@ int main(int argc, char *argv[])
 
 	} else {
 		int c;
-		double frac = (argc > 2) ? atof(argv[2]) : 1.0;
+		uint64_t max_len = (argc > 2) ? atof(argv[2]) : 1.0;
 		uint64_t const rl = 100;
 
 		kvec_t(char) buf;
@@ -356,7 +356,7 @@ int main(int argc, char *argv[])
 		uint64_t base = 0;
 		while((c = getchar()) != EOF) {
 			if(c == '\n') {
-				uint64_t l = (uint64_t)(frac * (kv_size(buf) - base));
+				uint64_t l = MIN2(max_len, kv_size(buf) - base);
 				for(i = 0; i < rl; i++) {
 					kv_push(buf, rbase());
 				}
@@ -446,10 +446,11 @@ int main(int argc, char *argv[])
 
 		bench_start(wl);
 		for(i = 0; i < kv_size(seq) / 2; i++) {
-			wavefront(wwork, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1));
+			uint32_t l = wavefront(wwork, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1));
+			swl += l > 0.8 * (kv_at(len, i * 2) + kv_at(len, i * 2 + 1));
 		}
 		bench_end(wl);
-		print_bench(flag, "wavefront", bench_get(wl), bench_get(wl), 0, 0);
+		print_bench(flag, "wavefront", bench_get(wl), bench_get(wl), swl, 0);
 
 		/* SSW library */
 		/* convert sequence to number string */
@@ -467,11 +468,11 @@ int main(int argc, char *argv[])
 			s_align *r = ssw_align(sp, (int8_t *)kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), -gi, -ge, 8, 0, 0, 30);
 			bench_end(fa);
 
-			sfa += r->score1;
+			sfa += r->score1 > 0.8 * kv_at(ascore, i);
 			align_destroy(r);
 			init_destroy(sp);
 		}
-		print_bench(flag, "farrar", bench_get(fa), bench_get(fa), sfa, 0);
+		print_bench(flag, "farrar", bench_get(fa), bench_get(fa), 0, sfa);
 
 		if(flag != 0) {
 			printf("\n");
