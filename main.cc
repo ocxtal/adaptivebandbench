@@ -345,10 +345,13 @@ int main(int argc, char *argv[])
 		kvec_t(char) buf;
 		kvec_t(char *) seq;
 		kvec_t(uint64_t) len;
+		kvec_t(uint32_t) lscore, ascore;
 
 		kv_init(buf);
 		kv_init(seq);
 		kv_init(len);
+		kv_init(lscore);
+		kv_init(ascore);
 
 		uint64_t base = 0;
 		while((c = getchar()) != EOF) {
@@ -374,17 +377,30 @@ int main(int argc, char *argv[])
 			kv_at(seq, i) += (ptrdiff_t)buf.a;
 		}
 
+		/* collect scores with full-sized dp */
+		for(i = 0; i < kv_size(seq) / 2; i++) {
+			sw_result_t l = sw_linear(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, ge);
+			kv_push(lscore, l.score);
+			free(l.path);
+
+			sw_result_t a = sw_affine(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge);
+			kv_push(ascore, a.score);
+			free(a.path);
+		}
+
 		/* blast */
 		bench_init(bl);
 		bench_init(ba);
 		bench_start(bl);
 		for(i = 0; i < kv_size(seq) / 2; i++) {
-			sbl += blast_linear(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, ge, xt);
+			uint32_t s = blast_linear(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, ge, xt);
+			sbl += s > 0.8 * kv_at(lscore, i);
 		}
 		bench_end(bl);
 		bench_start(ba);
 		for(i = 0; i < kv_size(seq) / 2; i++) {
-			sba += blast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
+			uint32_t s = blast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
+			sba += s > 0.8 * kv_at(ascore, i);
 		}
 		bench_end(ba);
 		print_bench(flag, "blast", bench_get(bl), bench_get(ba), sbl, sba);
@@ -394,12 +410,14 @@ int main(int argc, char *argv[])
 		bench_init(sa);
 		bench_start(sl);
 		for(i = 0; i < kv_size(seq) / 2; i++) {
-			ssl += simdblast_linear(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, ge, xt);
+			uint32_t s = simdblast_linear(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, ge, xt);
+			ssl += s > 0.8 * kv_at(lscore, i);
 		}
 		bench_end(sl);
 		bench_start(sa);
 		for(i = 0; i < kv_size(seq) / 2; i++) {
-			ssa += simdblast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
+			uint32_t s = simdblast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
+			ssa += s > 0.8 * kv_at(ascore, i);
 		}
 		bench_end(sa);
 		print_bench(flag, "simdblast", bench_get(sl), bench_get(sa), ssl, ssa);
@@ -410,12 +428,14 @@ int main(int argc, char *argv[])
 		bench_init(dda);
 		bench_start(ddl);
 		for(i = 0; i < kv_size(seq) / 2; i++) {
-			sddl += ddiag_linear(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, ge, xt);
+			uint32_t s = ddiag_linear(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, ge, xt);
+			sddl += s > 0.8 * kv_at(lscore, i);
 		}
 		bench_end(ddl);
 		bench_start(dda);
 		for(i = 0; i < kv_size(seq) / 2; i++) {
-			sdda += ddiag_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
+			uint32_t s = ddiag_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
+			sdda += s > 0.8 * kv_at(ascore, i);
 		}
 		bench_end(dda);
 		print_bench(flag, "aband", bench_get(ddl), bench_get(dda), sddl, sdda);
