@@ -16,7 +16,14 @@ bench:
 	$(CC) $(CFLAGS) -c -o wave/QV.o wave/QV.c
 	$(CC) $(CFLAGS) -c -o wave/align.o wave/align.c
 	$(CC) $(CFLAGS) -c -o ssw.o ssw.c
+	$(CC) $(CFLAGS) -c -o parasail/cpuid.o -I. parasail/cpuid.c
+	$(CC) $(CFLAGS) -c -o parasail/io.o -I. parasail/io.c
+	$(CC) $(CFLAGS) -c -o parasail/matrix_lookup.o -I. parasail/matrix_lookup.c
+	$(CC) $(CFLAGS) -c -o parasail/memory.o -I. parasail/memory.c
+	$(CC) $(CFLAGS) -c -o parasail/memory_sse.o -I. parasail/memory_sse.c
+	$(CC) $(CFLAGS) -c -o parasail/time.o -I. parasail/time.c
+	$(CC) $(CFLAGS) -c -o sg_striped_sse41_128_16.o -I. sg_striped_sse41_128_16.c
 	$(CC) $(CFLAGS) -c -o full.o full.c
-	$(CXX) $(CFLAGS) -o bin/bench main.cc aband.cc blast.cc simdblast.cc wave/DB.o wave/QV.o wave/align.o ssw.o full.o -DBENCH -DBW=32
+	$(CXX) $(CFLAGS) -o bin/bench main.cc aband.cc blast.cc simdblast.cc wave/DB.o wave/QV.o wave/align.o ssw.o parasail/cpuid.o parasail/io.o parasail/matrix_lookup.o parasail/memory.o parasail/memory_sse.o parasail/time.o sg_striped_sse41_128_16.o full.o -DBENCH -DBW=32
 
 
