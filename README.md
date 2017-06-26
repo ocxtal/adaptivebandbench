@@ -133,18 +133,26 @@ The figure 3(d), recall rate with different gap insertion size, was generated wi
 
 ### Speed benchmark
 
-`scripts/bench.sh` runs `../bin/bench` with sequence lengths varied within [100, 10k].
+`scripts/speed.sh` invokes `../bin/bench` with sequences in `../seq` with lengths varied within [1, 10k].
 
 
 ### Figure generation
 
 
-The results used in the paper is contained in results/ directory and plotted to eps files with  `plot.py` and `plot.r`. The `plot.py` scripts open the result files in `../results` directory and perform some preprocesses required in `plot.r`.
+The results used in the paper is contained in results/ directory and plotted to eps files with  `plot.py` and `plot_heatmap.R`. The `plot.py` scripts open the result files in `../results` directory and perform some preprocesses required in `plot_heatmap.R`. Another script `plot_spd.R` generates a length-calc.time plotting from a result of the `speed.sh`
+
+Plotting heatmap:
 
 ```
 $ cd results
 $ python ../scripts/plot.py
-$ rscript ../scripts/plot.r
+$ Rscript ../scripts/plot.r
+```
+
+Plotting graph:
+
+```
+$ Rscript plot_spd.R result.tsv result.pdf
 ```
 
 

@@ -251,7 +251,10 @@ int main(int argc, char *argv[])
 	gettimeofday(&tv, NULL);
 	unsigned long s = (argc > 3) ? atoi(argv[3]) : tv.tv_usec;
 	srand(s);
-	print_msg(flag, "%lu\n", s);
+
+	if(flag == 0) {
+		print_msg(flag, "%lu\n", s);
+	}
 
 	/* malloc work */
 	void *work = aligned_malloc(1024 * 1024 * 1024, sizeof(__m128i));
@@ -345,6 +348,10 @@ int main(int argc, char *argv[])
 		int c;
 		uint64_t max_len = (argc > 2) ? atoi(argv[2]) : 10000;
 		uint64_t const rl = 100;
+
+		if(flag != 0) {
+			printf("%lu\t", max_len);
+		}
 
 		kvec_t(char) buf;
 		kvec_t(char *) seq;
