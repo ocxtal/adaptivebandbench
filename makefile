@@ -24,6 +24,6 @@ bench:
 	$(CC) $(CFLAGS) -c -o parasail/time.o -I. parasail/time.c
 	$(CC) $(CFLAGS) -c -o sg_striped_sse41_128_16.o -I. sg_striped_sse41_128_16.c
 	$(CC) $(CFLAGS) -c -o full.o full.c
-	$(CXX) $(CFLAGS) -o bin/bench main.cc aband.cc blast.cc simdblast.cc wave/DB.o wave/QV.o wave/align.o ssw.o parasail/cpuid.o parasail/io.o parasail/matrix_lookup.o parasail/memory.o parasail/memory_sse.o parasail/time.o sg_striped_sse41_128_16.o full.o -DBENCH -DBW=32
+	$(CXX) $(CFLAGS) -o bin/bench -DBW=64 main.cc aband.cc blast.cc simdblast.cc wave/DB.o wave/QV.o wave/align.o ssw.o parasail/cpuid.o parasail/io.o parasail/matrix_lookup.o parasail/memory.o parasail/memory_sse.o parasail/time.o sg_striped_sse41_128_16.o full.o -DBENCH
 
 

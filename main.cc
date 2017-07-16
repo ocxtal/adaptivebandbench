@@ -17,12 +17,15 @@
 #include "ssw.h"
 
 #define DEBUG
-
 #define M 					( 1 )
-#define X 					( 1 )
-#define GI 					( 1 )
+#define X 					( 2 )
+#define GI 					( 2 )
 #define GE 					( 1 )
-#define XDROP				( 40 )
+#if defined(BW) && BW == 32
+#  define XDROP				( 40 )
+#else
+#  define XDROP				( 80 )
+#endif
 
 int blast_linear(
 	void *work,
@@ -461,7 +464,9 @@ int main(int argc, char *argv[])
 			sdda += s > 0.8 * kv_at(ascore, i);
 
 			#ifdef DEBUG
-			print_alignment(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), kv_at(apath, i));
+			if(s <= 0.8 * kv_at(ascore, i)) {
+				print_alignment(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), kv_at(apath, i));
+			}
 			#endif
 		}
 		bench_end(dda);
