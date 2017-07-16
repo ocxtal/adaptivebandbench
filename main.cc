@@ -440,28 +440,29 @@ int main(int argc, char *argv[])
 			}
 		#endif
 
-		/* blast */
-		bench_init(bl);
-		bench_init(ba);
-		bench_start(ba);
-		for(i = 0; i < kv_size(seq) / 2; i++) {
-			uint32_t s = blast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
-			sba += s > 0.8 * kv_at(ascore, i);
-		}
-		bench_end(ba);
-		print_bench(flag, "blast", bench_get(bl), bench_get(ba), sbl, sba);
+		#ifndef DEBUG
+			/* blast */
+			bench_init(bl);
+			bench_init(ba);
+			bench_start(ba);
+			for(i = 0; i < kv_size(seq) / 2; i++) {
+				uint32_t s = blast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
+				sba += s > 0.8 * kv_at(ascore, i);
+			}
+			bench_end(ba);
+			print_bench(flag, "blast", bench_get(bl), bench_get(ba), sbl, sba);
 
-		/* simdblast */
-		bench_init(sl);
-		bench_init(sa);
-		bench_start(sa);
-		for(i = 0; i < kv_size(seq) / 2; i++) {
-			uint32_t s = simdblast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
-			ssa += s > 0.8 * kv_at(ascore, i);
-		}
-		bench_end(sa);
-		print_bench(flag, "simdblast", bench_get(sl), bench_get(sa), ssl, ssa);
-
+			/* simdblast */
+			bench_init(sl);
+			bench_init(sa);
+			bench_start(sa);
+			for(i = 0; i < kv_size(seq) / 2; i++) {
+				uint32_t s = simdblast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
+				ssa += s > 0.8 * kv_at(ascore, i);
+			}
+			bench_end(sa);
+			print_bench(flag, "simdblast", bench_get(sl), bench_get(sa), ssl, ssa);
+		#endif
 
 		/* adaptive banded */
 		bench_init(ddl);
@@ -482,55 +483,57 @@ int main(int argc, char *argv[])
 		bench_end(dda);
 		print_bench(flag, "aband", bench_get(ddl), bench_get(dda), sddl, sdda);
 
-		/* wavefront */
-		bench_init(wl);
-		struct wavefront_work_s *wwork = wavefront_init_work();
-		
-		if(max_len >= 100) {
-			bench_start(wl);
-			for(i = 0; i < kv_size(seq) / 2; i++) {
-				uint32_t l = wavefront(wwork, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1));
-				swl += l > 0.8 * (kv_at(len, i * 2) + kv_at(len, i * 2 + 1));
+		#ifndef DEBUG
+			/* wavefront */
+			bench_init(wl);
+			struct wavefront_work_s *wwork = wavefront_init_work();
+			
+			if(max_len >= 100) {
+				bench_start(wl);
+				for(i = 0; i < kv_size(seq) / 2; i++) {
+					uint32_t l = wavefront(wwork, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1));
+					swl += l > 0.8 * (kv_at(len, i * 2) + kv_at(len, i * 2 + 1));
+				}
+				bench_end(wl);
 			}
-			bench_end(wl);
-		}
-		print_bench(flag, "wavefront", bench_get(bl), bench_get(wl), 0, swl);
+			print_bench(flag, "wavefront", bench_get(bl), bench_get(wl), 0, swl);
 
-		/* parasail */
-		parasail_matrix_t *matrix = parasail_matrix_create("ACGT", M, -X);
+			/* parasail */
+			parasail_matrix_t *matrix = parasail_matrix_create("ACGT", M, -X);
 
-		bench_init(pa);
-		for(i = 0; i < kv_size(seq) / 2; i++) {
-			bench_start(pa);
-			parasail_result *r = parasail_sg_striped_sse41_128_16(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), -gi-ge, -ge, matrix);
-			bench_end(pa);
-			spa += r->score > 0.8 * kv_at(ascore, i);
-			parasail_result_free(r);
-		}
-		print_bench(flag, "parasail", bench_get(bl), bench_get(pa), 0, spa);
+			bench_init(pa);
+			for(i = 0; i < kv_size(seq) / 2; i++) {
+				bench_start(pa);
+				parasail_result *r = parasail_sg_striped_sse41_128_16(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), -gi-ge, -ge, matrix);
+				bench_end(pa);
+				spa += r->score > 0.8 * kv_at(ascore, i);
+				parasail_result_free(r);
+			}
+			print_bench(flag, "parasail", bench_get(bl), bench_get(pa), 0, spa);
 
 
-		/* SSW library */
-		/* convert sequence to number string */
-		for(i = 0; i < kv_size(buf); i++) {
-			if(kv_at(buf, i) == '\0') { continue; }
-			char c = kv_at(buf, i);
-			kv_at(buf, i) = (((c>>2) ^ (c>>1)) & 0x03) + 1;
-		}
+			/* SSW library */
+			/* convert sequence to number string */
+			for(i = 0; i < kv_size(buf); i++) {
+				if(kv_at(buf, i) == '\0') { continue; }
+				char c = kv_at(buf, i);
+				kv_at(buf, i) = (((c>>2) ^ (c>>1)) & 0x03) + 1;
+			}
 
-		bench_init(fa);
-		for(i = 0; i < kv_size(seq) / 2; i++) {
-			s_profile *sp = ssw_init((int8_t *)kv_at(seq, i * 2), kv_at(len, i * 2), score_matrix, 4, 1);
+			bench_init(fa);
+			for(i = 0; i < kv_size(seq) / 2; i++) {
+				s_profile *sp = ssw_init((int8_t *)kv_at(seq, i * 2), kv_at(len, i * 2), score_matrix, 4, 1);
 
-			bench_start(fa);
-			s_align *r = ssw_align(sp, (int8_t *)kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), -gi, -ge, 8, 0, 0, 30);
-			bench_end(fa);
+				bench_start(fa);
+				s_align *r = ssw_align(sp, (int8_t *)kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), -gi, -ge, 8, 0, 0, 30);
+				bench_end(fa);
 
-			sfa += r->score1 > 0.8 * kv_at(ascore, i);
-			align_destroy(r);
-			init_destroy(sp);
-		}
-		print_bench(flag, "farrar", bench_get(bl), bench_get(fa), 0, sfa);
+				sfa += r->score1 > 0.8 * kv_at(ascore, i);
+				align_destroy(r);
+				init_destroy(sp);
+			}
+			print_bench(flag, "farrar", bench_get(bl), bench_get(fa), 0, sfa);
+		#endif
 
 		if(flag != 0) {
 			printf("\n");
