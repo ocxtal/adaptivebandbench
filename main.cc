@@ -16,7 +16,13 @@
 #include "parasail.h"
 #include "ssw.h"
 
-#define XDROP		( 40 )
+#define DEBUG
+
+#define M 					( 1 )
+#define X 					( 1 )
+#define GI 					( 1 )
+#define GE 					( 1 )
+#define XDROP				( 40 )
 
 int blast_linear(
 	void *work,
@@ -153,8 +159,30 @@ wavefront(
 	return(aln.path->aepos + aln.path->bepos);
 }
 
+void print_alignment(char const *a, uint64_t alen, char const *b, uint64_t blen, char const *path)
+{
+	fprintf(stderr, "(%ld, %ld)\n", alen, blen);
+	fprintf(stderr, "len(%lu)\n", strlen(path));
 
+	for(uint64_t j = 0, k = 0; j < strlen(path); j++) {
+		if(path[j] != 'I') {
+			fprintf(stderr, "%c", a[k++]);
+		} else {
+			fprintf(stderr, "-");
+		}
+	}
+	fprintf(stderr, "\n");
+	for(uint64_t j = 0, k = 0; j < strlen(path); j++) {
+		if(path[j] != 'D') {
+			fprintf(stderr, "%c", b[k++]);
+		} else {
+			fprintf(stderr, "-");
+		}
+	}
+	fprintf(stderr, "\n");
 
+	fprintf(stderr, "%s\n\n", path);
+}
 
 /**
  * random sequence generator, modifier.
@@ -239,7 +267,7 @@ int main(int argc, char *argv[])
 	}
 
 	uint64_t i;
-	int const m = 1, x = -1, gi = -1, ge = -1;
+	int const m = M, x = -X, gi = -GI, ge = -GE;
 	int const xt = XDROP;
 	char *a, *b, *at, *bt;
 	bench_t bl, ba, sl, sa, ddl, dda, wl, pa, fa;
@@ -357,13 +385,14 @@ int main(int argc, char *argv[])
 		kvec_t(char) buf;
 		kvec_t(char *) seq;
 		kvec_t(uint64_t) len;
-		kvec_t(uint32_t) lscore, ascore;
+		kvec_t(uint32_t) ascore;
+		kvec_t(char *) apath;
 
 		kv_init(buf);
 		kv_init(seq);
 		kv_init(len);
-		kv_init(lscore);
 		kv_init(ascore);
+		kv_init(apath);			// debug
 
 		uint64_t base = 0;
 		while((c = getchar()) != EOF) {
@@ -390,29 +419,19 @@ int main(int argc, char *argv[])
 		}
 
 		/* collect scores with full-sized dp */
-		kv_reserve(lscore, kv_size(seq) / 2);
 		kv_reserve(ascore, kv_size(seq) / 2);
+		kv_reserve(apath, kv_size(seq) / 2);
 
 		#pragma omp parallel for
 		for(i = 0; i < kv_size(seq) / 2; i++) {
-			sw_result_t l = sw_linear(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, ge);
-			kv_at(lscore, i) = l.score;
-			free(l.path);
-
 			sw_result_t a = sw_affine(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge);
 			kv_at(ascore, i) = a.score;
-			free(a.path);
+			kv_at(apath, i) = a.path;
 		}
 
 		/* blast */
 		bench_init(bl);
 		bench_init(ba);
-		bench_start(bl);
-		for(i = 0; i < kv_size(seq) / 2; i++) {
-			uint32_t s = blast_linear(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, ge, xt);
-			sbl += s > 0.8 * kv_at(lscore, i);
-		}
-		bench_end(bl);
 		bench_start(ba);
 		for(i = 0; i < kv_size(seq) / 2; i++) {
 			uint32_t s = blast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
@@ -424,12 +443,6 @@ int main(int argc, char *argv[])
 		/* simdblast */
 		bench_init(sl);
 		bench_init(sa);
-		bench_start(sl);
-		for(i = 0; i < kv_size(seq) / 2; i++) {
-			uint32_t s = simdblast_linear(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, ge, xt);
-			ssl += s > 0.8 * kv_at(lscore, i);
-		}
-		bench_end(sl);
 		bench_start(sa);
 		for(i = 0; i < kv_size(seq) / 2; i++) {
 			uint32_t s = simdblast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
@@ -442,16 +455,14 @@ int main(int argc, char *argv[])
 		/* adaptive banded */
 		bench_init(ddl);
 		bench_init(dda);
-		bench_start(ddl);
-		for(i = 0; i < kv_size(seq) / 2; i++) {
-			uint32_t s = ddiag_linear(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, ge, xt);
-			sddl += s > 0.8 * kv_at(lscore, i);
-		}
-		bench_end(ddl);
 		bench_start(dda);
 		for(i = 0; i < kv_size(seq) / 2; i++) {
 			uint32_t s = ddiag_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
 			sdda += s > 0.8 * kv_at(ascore, i);
+
+			#ifdef DEBUG
+			print_alignment(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), kv_at(apath, i));
+			#endif
 		}
 		bench_end(dda);
 		print_bench(flag, "aband", bench_get(ddl), bench_get(dda), sddl, sdda);
@@ -468,7 +479,7 @@ int main(int argc, char *argv[])
 			}
 			bench_end(wl);
 		}
-		print_bench(flag, "wavefront", bench_get(wl), bench_get(wl), swl, 0);
+		print_bench(flag, "wavefront", bench_get(bl), bench_get(wl), 0, swl);
 
 		/* parasail */
 		parasail_matrix_t *matrix = parasail_matrix_create("ACGT", 2, -1);
@@ -481,7 +492,7 @@ int main(int argc, char *argv[])
 			parasail_result_free(r);
 		}
 		bench_end(pa);
-		print_bench(flag, "parasail", bench_get(pa), bench_get(pa), 0, spa);
+		print_bench(flag, "parasail", bench_get(bl), bench_get(pa), 0, spa);
 
 
 		/* SSW library */
@@ -504,7 +515,7 @@ int main(int argc, char *argv[])
 			align_destroy(r);
 			init_destroy(sp);
 		}
-		print_bench(flag, "farrar", bench_get(fa), bench_get(fa), 0, sfa);
+		print_bench(flag, "farrar", bench_get(bl), bench_get(fa), 0, sfa);
 
 		if(flag != 0) {
 			printf("\n");
@@ -513,6 +524,11 @@ int main(int argc, char *argv[])
 		kv_destroy(buf);
 		kv_destroy(seq);
 		kv_destroy(len);
+		kv_destroy(ascore);
+		for(i = 0; i < kv_size(apath); i++) {
+			free((char *)kv_at(apath, i));
+		}
+		kv_destroy(apath);
 	}
 
 	free(work);
