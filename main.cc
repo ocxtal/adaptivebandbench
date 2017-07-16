@@ -16,7 +16,6 @@
 #include "parasail.h"
 #include "ssw.h"
 
-//#define DEBUG
 #define M 					( 1 )
 #define X 					( 1 )
 #define GI 					( 1 )
@@ -28,7 +27,8 @@
 #endif
 
 #define PARASAIL_SCORE		1
-#define DEBUG_BLAST			1
+// #define DEBUG
+// #define DEBUG_BLAST			1
 
 int blast_linear(
 	void *work,
