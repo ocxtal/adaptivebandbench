@@ -27,7 +27,8 @@
 #  define XDROP				( 80 )
 #endif
 
-#define PARASAIL_SCORE
+#define PARASAIL_SCORE		1
+#define DEBUG_BLAST			1
 
 int blast_linear(
 	void *work,
@@ -447,6 +448,14 @@ int main(int argc, char *argv[])
 		for(i = 0; i < kv_size(seq) / 2; i++) {
 			uint32_t s = blast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
 			sba += s > 0.8 * kv_at(ascore, i);
+
+			#if defined(DEBUG) && defined(DEBUG_BLAST)
+			if(s <= 0.8 * kv_at(ascore, i)) {
+				sw_result_t a = sw_affine(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge);
+				print_alignment(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), a.path);
+				free(a.path);
+			}
+			#endif
 		}
 		bench_end(ba);
 		print_bench(flag, "blast", bench_get(bl), bench_get(ba), sbl, sba);
@@ -472,7 +481,7 @@ int main(int argc, char *argv[])
 			uint32_t s = ddiag_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
 			sdda += s > 0.8 * kv_at(ascore, i);
 
-			#ifdef DEBUG
+			#if defined(DEBUG) && !defined(DEBUG_BLAST)
 			if(s <= 0.8 * kv_at(ascore, i)) {
 				sw_result_t a = sw_affine(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge);
 				print_alignment(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), a.path);
