@@ -146,7 +146,7 @@ Plotting heatmap:
 ```
 $ cd results
 $ python ../scripts/plot.py
-$ Rscript ../scripts/plot.r
+$ Rscript ../scripts/plot.R
 ```
 
 Plotting graph:
