@@ -29,6 +29,8 @@ bench.modules:
 	$(CC) $(CFLAGS) -c -o sg_striped_sse41_128_16.o -I. sg_striped_sse41_128_16.c
 	$(CC) $(CFLAGS) -c -o full.o full.c
 
+bench: bench.32 bench.64 bench.aband.32 bench.aband.64 bench.blast.32 bench.blast.64
+
 bench.32: bench.modules
 	$(CXX) $(CFLAGS) -o bin/bench.32 -DBW=32 -DBENCH $(BENCH_SRCS) $(BENCH_MODULES)
 
