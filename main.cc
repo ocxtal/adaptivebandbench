@@ -27,6 +27,8 @@
 #  define XDROP				( 80 )
 #endif
 
+#define PARASAIL
+
 int blast_linear(
 	void *work,
 	char const *a,
@@ -389,13 +391,11 @@ int main(int argc, char *argv[])
 		kvec_t(char *) seq;
 		kvec_t(uint64_t) len;
 		kvec_t(uint32_t) ascore;
-		kvec_t(char *) apath;
 
 		kv_init(buf);
 		kv_init(seq);
 		kv_init(len);
 		kv_init(ascore);
-		kv_init(apath);			// debug
 
 		uint64_t base = 0;
 		while((c = getchar()) != EOF) {
@@ -423,14 +423,21 @@ int main(int argc, char *argv[])
 
 		/* collect scores with full-sized dp */
 		kv_reserve(ascore, kv_size(seq) / 2);
-		kv_reserve(apath, kv_size(seq) / 2);
 
-		#pragma omp parallel for
-		for(i = 0; i < kv_size(seq) / 2; i++) {
-			sw_result_t a = sw_affine(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge);
-			kv_at(ascore, i) = a.score;
-			kv_at(apath, i) = a.path;
-		}
+		#ifdef PARASAIL
+			parasail_matrix_t *_matrix = parasail_matrix_create("ACGT", 2, -1);
+			for(i = 0; i < kv_size(seq) / 2; i++) {
+				parasail_result *r = parasail_sg_striped_sse41_128_16(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), -gi, -ge, _matrix);
+				kv_at(ascore, i) = r->score;
+				parasail_result_free(r);
+			}
+		#else
+			#pragma omp parallel for
+			for(i = 0; i < kv_size(seq) / 2; i++) {
+				sw_result_t a = sw_affine(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge);
+				kv_at(ascore, i) = a.score;
+			}
+		#endif
 
 		/* blast */
 		bench_init(bl);
@@ -465,7 +472,9 @@ int main(int argc, char *argv[])
 
 			#ifdef DEBUG
 			if(s <= 0.8 * kv_at(ascore, i)) {
-				print_alignment(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), kv_at(apath, i));
+				sw_result_t a = sw_affine(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge);
+				print_alignment(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), a.path);
+				free(a.path);
 			}
 			#endif
 		}
@@ -490,13 +499,13 @@ int main(int argc, char *argv[])
 		parasail_matrix_t *matrix = parasail_matrix_create("ACGT", 2, -1);
 
 		bench_init(pa);
-		bench_start(pa);
 		for(i = 0; i < kv_size(seq) / 2; i++) {
+			bench_start(pa);
 			parasail_result *r = parasail_sg_striped_sse41_128_16(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), -gi, -ge, matrix);
+			bench_end(pa);
 			spa += r->score > 0.8 * kv_at(ascore, i);
 			parasail_result_free(r);
 		}
-		bench_end(pa);
 		print_bench(flag, "parasail", bench_get(bl), bench_get(pa), 0, spa);
 
 
@@ -530,10 +539,6 @@ int main(int argc, char *argv[])
 		kv_destroy(seq);
 		kv_destroy(len);
 		kv_destroy(ascore);
-		for(i = 0; i < kv_size(apath); i++) {
-			free((char *)kv_at(apath, i));
-		}
-		kv_destroy(apath);
 	}
 
 	free(work);
