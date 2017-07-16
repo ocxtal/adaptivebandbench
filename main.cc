@@ -16,7 +16,7 @@
 #include "parasail.h"
 #include "ssw.h"
 
-#define DEBUG
+//#define DEBUG
 #define M 					( 1 )
 #define X 					( 1 )
 #define GI 					( 1 )
@@ -425,10 +425,10 @@ int main(int argc, char *argv[])
 		kv_reserve(ascore, kv_size(seq) / 2);
 
 		#ifdef PARASAIL_SCORE
-			parasail_matrix_t *_matrix = parasail_matrix_create("ACGT", 2, -1);
+			parasail_matrix_t *_matrix = parasail_matrix_create("ACGT", M, -X);
 			#pragma omp parallel for
 			for(i = 0; i < kv_size(seq) / 2; i++) {
-				parasail_result *r = parasail_sg_striped_sse41_128_16(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), -gi, -ge, _matrix);
+				parasail_result *r = parasail_sg_striped_sse41_128_16(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), -gi-ge, -ge, _matrix);
 				kv_at(ascore, i) = r->score;
 				parasail_result_free(r);
 			}
@@ -446,7 +446,6 @@ int main(int argc, char *argv[])
 		bench_start(ba);
 		for(i = 0; i < kv_size(seq) / 2; i++) {
 			uint32_t s = blast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
-			printf("%d, %d\n", s, kv_at(ascore, i));
 			sba += s > 0.8 * kv_at(ascore, i);
 		}
 		bench_end(ba);
@@ -498,12 +497,12 @@ int main(int argc, char *argv[])
 		print_bench(flag, "wavefront", bench_get(bl), bench_get(wl), 0, swl);
 
 		/* parasail */
-		parasail_matrix_t *matrix = parasail_matrix_create("ACGT", 2, -1);
+		parasail_matrix_t *matrix = parasail_matrix_create("ACGT", M, -X);
 
 		bench_init(pa);
 		for(i = 0; i < kv_size(seq) / 2; i++) {
 			bench_start(pa);
-			parasail_result *r = parasail_sg_striped_sse41_128_16(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), -gi, -ge, matrix);
+			parasail_result *r = parasail_sg_striped_sse41_128_16(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), -gi-ge, -ge, matrix);
 			bench_end(pa);
 			spa += r->score > 0.8 * kv_at(ascore, i);
 			parasail_result_free(r);
