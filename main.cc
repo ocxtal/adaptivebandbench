@@ -27,7 +27,7 @@
 #endif
 
 #define PARASAIL_SCORE		1
-// #define DEBUG
+// #define DEBUG_PATH
 // #define DEBUG_BLAST			1
 
 int blast_linear(
@@ -449,7 +449,7 @@ int main(int argc, char *argv[])
 			uint32_t s = blast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
 			sba += s > 0.8 * kv_at(ascore, i);
 
-			#if defined(DEBUG) && defined(DEBUG_BLAST)
+			#if defined(DEBUG_PATH) && defined(DEBUG_BLAST)
 			if(s <= 0.8 * kv_at(ascore, i)) {
 				sw_result_t a = sw_affine(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge);
 				print_alignment(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), a.path);
@@ -460,7 +460,7 @@ int main(int argc, char *argv[])
 		bench_end(ba);
 		print_bench(flag, "blast", bench_get(bl), bench_get(ba), sbl, sba);
 
-		#ifndef DEBUG
+		#ifndef DEBUG_PATH
 			/* simdblast */
 			bench_init(sl);
 			bench_init(sa);
@@ -481,7 +481,7 @@ int main(int argc, char *argv[])
 			uint32_t s = ddiag_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
 			sdda += s > 0.8 * kv_at(ascore, i);
 
-			#if defined(DEBUG) && !defined(DEBUG_BLAST)
+			#if defined(DEBUG_PATH) && !defined(DEBUG_BLAST)
 			if(s <= 0.8 * kv_at(ascore, i)) {
 				sw_result_t a = sw_affine(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge);
 				print_alignment(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), a.path);
@@ -492,7 +492,7 @@ int main(int argc, char *argv[])
 		bench_end(dda);
 		print_bench(flag, "aband", bench_get(ddl), bench_get(dda), sddl, sdda);
 
-		#ifndef DEBUG
+		#ifndef DEBUG_PATH
 			/* wavefront */
 			bench_init(wl);
 			struct wavefront_work_s *wwork = wavefront_init_work();

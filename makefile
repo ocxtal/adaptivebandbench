@@ -36,14 +36,14 @@ bench.64: bench.modules
 	$(CXX) $(CFLAGS) -o bin/bench.64 -DBW=64 -DBENCH $(BENCH_SRCS) $(BENCH_MODULES)
 
 bench.aband.32: bench.modules
-	$(CXX) $(CFLAGS) -o bin/bench.aband.32 -DBW=32 -DDEBUG -DBENCH $(BENCH_SRCS) $(BENCH_MODULES)
+	$(CXX) $(CFLAGS) -o bin/bench.aband.32 -DBW=32 -DDEBUG_PATH -DBENCH $(BENCH_SRCS) $(BENCH_MODULES)
 
 bench.aband.64: bench.modules
-	$(CXX) $(CFLAGS) -o bin/bench.blast.64 -DBW=64 -DDEBUG -DBENCH $(BENCH_SRCS) $(BENCH_MODULES)
+	$(CXX) $(CFLAGS) -o bin/bench.blast.64 -DBW=64 -DDEBUG_PATH -DBENCH $(BENCH_SRCS) $(BENCH_MODULES)
 
 bench.blast.32: bench.modules
-	$(CXX) $(CFLAGS) -o bin/bench.blast.32 -DBW=32 -DDEBUG -DDEBUG_BLAST -DBENCH $(BENCH_SRCS) $(BENCH_MODULES)
+	$(CXX) $(CFLAGS) -o bin/bench.blast.32 -DBW=32 -DDEBUG_PATH -DDEBUG_BLAST -DBENCH $(BENCH_SRCS) $(BENCH_MODULES)
 
 bench.blast.64: bench.modules
-	$(CXX) $(CFLAGS) -o bin/bench.blast.64 -DBW=64 -DDEBUG -DDEBUG_BLAST -DBENCH $(BENCH_SRCS) $(BENCH_MODULES)
+	$(CXX) $(CFLAGS) -o bin/bench.blast.64 -DBW=64 -DDEBUG_PATH -DDEBUG_BLAST -DBENCH $(BENCH_SRCS) $(BENCH_MODULES)
 
