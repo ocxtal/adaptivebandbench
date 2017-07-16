@@ -57,8 +57,8 @@ double parasail_time(void)
 #else
     struct timespec ts;
     /* Works on Linux */
-    long retval = clock_gettime(CLOCK_REALTIME, &ts);
-    assert(0 == retval);
+    // long retval = clock_gettime(CLOCK_REALTIME, &ts);
+    // assert(0 == retval);
     return (double)(ts.tv_sec) + (double)(ts.tv_nsec)/1000000000.0;
 #endif
 #endif
