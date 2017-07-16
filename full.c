@@ -289,7 +289,7 @@ int main_ext(int argc, char *argv[])
 			argv[3], strlen(argv[3]),
 			score_matrix,
 			atoi(argv[5]));
-		printf("%d\t%llu\t%llu\t%s\n",
+		printf("%d\t%lu\t%lu\t%s\n",
 			result.score,
 			result.apos,
 			result.bpos,
@@ -302,7 +302,7 @@ int main_ext(int argc, char *argv[])
 			score_matrix,
 			atoi(argv[5]),
 			atoi(argv[6]));
-		printf("%d\t%llu\t%llu\t%s\n",
+		printf("%d\t%lu\t%lu\t%s\n",
 			result.score,
 			result.apos,
 			result.bpos,
@@ -327,7 +327,7 @@ int main(int argc, char *argv[])
 	build_score_matrix(score_matrix, 1, -1);
 
 	sw_result_t sl = sw_linear(a, strlen(a), b, strlen(b), score_matrix, -1);
-	printf("%d\t%llu\t%llu\t%s\n",
+	printf("%d\t%lu\t%lu\t%s\n",
 		sl.score,
 		sl.apos,
 		sl.bpos,
@@ -335,7 +335,7 @@ int main(int argc, char *argv[])
 	free(sl.path);
 
 	sw_result_t sa = sw_affine(a, strlen(a), b, strlen(b), score_matrix, -1, -1);
-	printf("%d\t%llu\t%llu\t%s\n",
+	printf("%d\t%lu\t%lu\t%s\n",
 		sa.score,
 		sa.apos,
 		sa.bpos,

@@ -2,7 +2,9 @@
 /**
  * @file main.cc
  */
+#define __STDC_LIMIT_MACROS
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
@@ -11,7 +13,19 @@
 #include "full.h"
 #include "kvec.h"
 #include "bench.h"
+#include "parasail.h"
 #include "ssw.h"
+
+//#define DEBUG
+#define M 					( 1 )
+#define X 					( 1 )
+#define GI 					( 1 )
+#define GE 					( 1 )
+#if defined(BW) && BW == 32
+#  define XDROP				( 40 )
+#else
+#  define XDROP				( 80 )
+#endif
 
 int blast_linear(
 	void *work,
@@ -145,11 +159,33 @@ wavefront(
 
 	forward_wave(w, s, &aln, &work->bpath, &low, high, 0, -INT32_MAX, INT32_MAX);
 	// fprintf(stderr, "(%u, %u), (%u, %u)\n", alen, blen, aln.path->aepos, aln.path->bepos);
-	return(0);
+	return(aln.path->aepos + aln.path->bepos);
 }
 
+void print_alignment(char const *a, uint64_t alen, char const *b, uint64_t blen, char const *path)
+{
+	fprintf(stderr, "(%ld, %ld)\n", alen, blen);
+	fprintf(stderr, "len(%lu)\n", strlen(path));
 
+	for(uint64_t j = 0, k = 0; j < strlen(path); j++) {
+		if(path[j] != 'I') {
+			fprintf(stderr, "%c", a[k++]);
+		} else {
+			fprintf(stderr, "-");
+		}
+	}
+	fprintf(stderr, "\n");
+	for(uint64_t j = 0, k = 0; j < strlen(path); j++) {
+		if(path[j] != 'D') {
+			fprintf(stderr, "%c", b[k++]);
+		} else {
+			fprintf(stderr, "-");
+		}
+	}
+	fprintf(stderr, "\n");
 
+	fprintf(stderr, "%s\n\n", path);
+}
 
 /**
  * random sequence generator, modifier.
@@ -213,11 +249,11 @@ int print_msg(int flag, char const *fmt, ...)
 int print_bench(int flag, char const *name, int64_t l, int64_t a, int64_t sl, int64_t sa)
 {
 	if(flag == 0) {
-		return(printf("%s\t%lld\t%lld\t%lld\t%lld\n", name, l / 1000, a / 1000, sl, sa));
+		return(printf("%s\t%ld\t%ld\t%ld\t%ld\n", name, l / 1000, a / 1000, sl, sa));
 	} else if(flag == 1) {
-		return(printf("%lld\t%lld\t", l / 1000, a / 1000));
+		return(printf("%ld\t%ld\t", l / 1000, a / 1000));
 	} else if(flag == 2) {
-		return(printf("%lld\t", a / 1000));
+		return(printf("%ld\t", a / 1000));
 	}
 	return(0);
 }
@@ -234,11 +270,11 @@ int main(int argc, char *argv[])
 	}
 
 	uint64_t i;
-	int const m = 1, x = -1, gi = -1, ge = -1;
-	int const xt = 30;
+	int const m = M, x = -X, gi = -GI, ge = -GE;
+	int const xt = XDROP;
 	char *a, *b, *at, *bt;
-	bench_t bl, ba, sl, sa, ddl, dda, wl, fa;
-	volatile int64_t sbl = 0, sba = 0, ssl = 0, ssa = 0, sddl = 0, sdda = 0, sfa = 0;
+	bench_t bl, ba, sl, sa, ddl, dda, wl, pa, fa;
+	volatile int64_t sbl = 0, sba = 0, ssl = 0, ssa = 0, sddl = 0, sdda = 0, sfa = 0, spa = 0, swl = 0;
 	struct timeval tv;
 
 	int8_t score_matrix[16] __attribute__(( aligned(16) ));
@@ -247,7 +283,10 @@ int main(int argc, char *argv[])
 	gettimeofday(&tv, NULL);
 	unsigned long s = (argc > 3) ? atoi(argv[3]) : tv.tv_usec;
 	srand(s);
-	print_msg(flag, "%lu\n", s);
+
+	if(flag == 0) {
+		print_msg(flag, "%lu\n", s);
+	}
 
 	/* malloc work */
 	void *work = aligned_malloc(1024 * 1024 * 1024, sizeof(__m128i));
@@ -339,21 +378,29 @@ int main(int argc, char *argv[])
 
 	} else {
 		int c;
-		double frac = (argc > 2) ? atof(argv[2]) : 1.0;
+		uint64_t max_len = (argc > 2) ? atoi(argv[2]) : 10000;
 		uint64_t const rl = 100;
+
+		if(flag != 0) {
+			printf("%lu\t", max_len);
+		}
 
 		kvec_t(char) buf;
 		kvec_t(char *) seq;
 		kvec_t(uint64_t) len;
+		kvec_t(uint32_t) ascore;
+		kvec_t(char *) apath;
 
 		kv_init(buf);
 		kv_init(seq);
 		kv_init(len);
+		kv_init(ascore);
+		kv_init(apath);			// debug
 
 		uint64_t base = 0;
 		while((c = getchar()) != EOF) {
 			if(c == '\n') {
-				uint64_t l = (uint64_t)(frac * (kv_size(buf) - base));
+				uint64_t l = MIN2(max_len, kv_size(buf) - base);
 				for(i = 0; i < rl; i++) {
 					kv_push(buf, rbase());
 				}
@@ -374,17 +421,24 @@ int main(int argc, char *argv[])
 			kv_at(seq, i) += (ptrdiff_t)buf.a;
 		}
 
+		/* collect scores with full-sized dp */
+		kv_reserve(ascore, kv_size(seq) / 2);
+		kv_reserve(apath, kv_size(seq) / 2);
+
+		#pragma omp parallel for
+		for(i = 0; i < kv_size(seq) / 2; i++) {
+			sw_result_t a = sw_affine(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge);
+			kv_at(ascore, i) = a.score;
+			kv_at(apath, i) = a.path;
+		}
+
 		/* blast */
 		bench_init(bl);
 		bench_init(ba);
-		bench_start(bl);
-		for(i = 0; i < kv_size(seq) / 2; i++) {
-			sbl += blast_linear(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, ge, xt);
-		}
-		bench_end(bl);
 		bench_start(ba);
 		for(i = 0; i < kv_size(seq) / 2; i++) {
-			sba += blast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
+			uint32_t s = blast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
+			sba += s > 0.8 * kv_at(ascore, i);
 		}
 		bench_end(ba);
 		print_bench(flag, "blast", bench_get(bl), bench_get(ba), sbl, sba);
@@ -392,14 +446,10 @@ int main(int argc, char *argv[])
 		/* simdblast */
 		bench_init(sl);
 		bench_init(sa);
-		bench_start(sl);
-		for(i = 0; i < kv_size(seq) / 2; i++) {
-			ssl += simdblast_linear(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, ge, xt);
-		}
-		bench_end(sl);
 		bench_start(sa);
 		for(i = 0; i < kv_size(seq) / 2; i++) {
-			ssa += simdblast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
+			uint32_t s = simdblast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
+			ssa += s > 0.8 * kv_at(ascore, i);
 		}
 		bench_end(sa);
 		print_bench(flag, "simdblast", bench_get(sl), bench_get(sa), ssl, ssa);
@@ -408,14 +458,16 @@ int main(int argc, char *argv[])
 		/* adaptive banded */
 		bench_init(ddl);
 		bench_init(dda);
-		bench_start(ddl);
-		for(i = 0; i < kv_size(seq) / 2; i++) {
-			sddl += ddiag_linear(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, ge, xt);
-		}
-		bench_end(ddl);
 		bench_start(dda);
 		for(i = 0; i < kv_size(seq) / 2; i++) {
-			sdda += ddiag_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
+			uint32_t s = ddiag_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
+			sdda += s > 0.8 * kv_at(ascore, i);
+
+			#ifdef DEBUG
+			if(s <= 0.8 * kv_at(ascore, i)) {
+				print_alignment(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), kv_at(apath, i));
+			}
+			#endif
 		}
 		bench_end(dda);
 		print_bench(flag, "aband", bench_get(ddl), bench_get(dda), sddl, sdda);
@@ -423,13 +475,30 @@ int main(int argc, char *argv[])
 		/* wavefront */
 		bench_init(wl);
 		struct wavefront_work_s *wwork = wavefront_init_work();
-
-		bench_start(wl);
-		for(i = 0; i < kv_size(seq) / 2; i++) {
-			wavefront(wwork, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1));
+		
+		if(max_len >= 100) {
+			bench_start(wl);
+			for(i = 0; i < kv_size(seq) / 2; i++) {
+				uint32_t l = wavefront(wwork, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1));
+				swl += l > 0.8 * (kv_at(len, i * 2) + kv_at(len, i * 2 + 1));
+			}
+			bench_end(wl);
 		}
-		bench_end(wl);
-		print_bench(flag, "wavefront", bench_get(wl), bench_get(wl), 0, 0);
+		print_bench(flag, "wavefront", bench_get(bl), bench_get(wl), 0, swl);
+
+		/* parasail */
+		parasail_matrix_t *matrix = parasail_matrix_create("ACGT", 2, -1);
+
+		bench_init(pa);
+		bench_start(pa);
+		for(i = 0; i < kv_size(seq) / 2; i++) {
+			parasail_result *r = parasail_sg_striped_sse41_128_16(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), -gi, -ge, matrix);
+			spa += r->score > 0.8 * kv_at(ascore, i);
+			parasail_result_free(r);
+		}
+		bench_end(pa);
+		print_bench(flag, "parasail", bench_get(bl), bench_get(pa), 0, spa);
+
 
 		/* SSW library */
 		/* convert sequence to number string */
@@ -447,11 +516,11 @@ int main(int argc, char *argv[])
 			s_align *r = ssw_align(sp, (int8_t *)kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), -gi, -ge, 8, 0, 0, 30);
 			bench_end(fa);
 
-			sfa += r->score1;
+			sfa += r->score1 > 0.8 * kv_at(ascore, i);
 			align_destroy(r);
 			init_destroy(sp);
 		}
-		print_bench(flag, "farrar", bench_get(fa), bench_get(fa), sfa, 0);
+		print_bench(flag, "farrar", bench_get(bl), bench_get(fa), 0, sfa);
 
 		if(flag != 0) {
 			printf("\n");
@@ -460,6 +529,11 @@ int main(int argc, char *argv[])
 		kv_destroy(buf);
 		kv_destroy(seq);
 		kv_destroy(len);
+		kv_destroy(ascore);
+		for(i = 0; i < kv_size(apath); i++) {
+			free((char *)kv_at(apath, i));
+		}
+		kv_destroy(apath);
 	}
 
 	free(work);

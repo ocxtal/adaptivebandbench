@@ -26,8 +26,9 @@ void *aligned_malloc(
 	size_t align)
 {
 	void *ptr = NULL;
-	posix_memalign(&ptr, align, size);
-	debug("posix_memalign(%p)", ptr);
+	if(posix_memalign(&ptr, align, size) != 0) {
+		return(NULL);
+	}
 	return(ptr);
 }
 
