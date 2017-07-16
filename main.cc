@@ -16,7 +16,7 @@
 #include "parasail.h"
 #include "ssw.h"
 
-//#define DEBUG
+#define DEBUG
 #define M 					( 1 )
 #define X 					( 1 )
 #define GI 					( 1 )
@@ -27,7 +27,7 @@
 #  define XDROP				( 80 )
 #endif
 
-#define PARASAIL
+#define PARASAIL_SCORE
 
 int blast_linear(
 	void *work,
@@ -424,8 +424,9 @@ int main(int argc, char *argv[])
 		/* collect scores with full-sized dp */
 		kv_reserve(ascore, kv_size(seq) / 2);
 
-		#ifdef PARASAIL
+		#ifdef PARASAIL_SCORE
 			parasail_matrix_t *_matrix = parasail_matrix_create("ACGT", 2, -1);
+			#pragma omp parallel for
 			for(i = 0; i < kv_size(seq) / 2; i++) {
 				parasail_result *r = parasail_sg_striped_sse41_128_16(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), -gi, -ge, _matrix);
 				kv_at(ascore, i) = r->score;
@@ -445,6 +446,7 @@ int main(int argc, char *argv[])
 		bench_start(ba);
 		for(i = 0; i < kv_size(seq) / 2; i++) {
 			uint32_t s = blast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
+			printf("%d, %d\n", s, kv_at(ascore, i));
 			sba += s > 0.8 * kv_at(ascore, i);
 		}
 		bench_end(ba);
