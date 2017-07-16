@@ -16,6 +16,7 @@
 #include "parasail.h"
 #include "ssw.h"
 
+#define XDROP		( 40 )
 
 int blast_linear(
 	void *work,
@@ -239,7 +240,7 @@ int main(int argc, char *argv[])
 
 	uint64_t i;
 	int const m = 1, x = -1, gi = -1, ge = -1;
-	int const xt = 40;
+	int const xt = XDROP;
 	char *a, *b, *at, *bt;
 	bench_t bl, ba, sl, sa, ddl, dda, wl, pa, fa;
 	volatile int64_t sbl = 0, sba = 0, ssl = 0, ssa = 0, sddl = 0, sdda = 0, sfa = 0, spa = 0, swl = 0;
