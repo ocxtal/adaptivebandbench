@@ -440,18 +440,18 @@ int main(int argc, char *argv[])
 			}
 		#endif
 
-		#ifndef DEBUG
-			/* blast */
-			bench_init(bl);
-			bench_init(ba);
-			bench_start(ba);
-			for(i = 0; i < kv_size(seq) / 2; i++) {
-				uint32_t s = blast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
-				sba += s > 0.8 * kv_at(ascore, i);
-			}
-			bench_end(ba);
-			print_bench(flag, "blast", bench_get(bl), bench_get(ba), sbl, sba);
+		/* blast */
+		bench_init(bl);
+		bench_init(ba);
+		bench_start(ba);
+		for(i = 0; i < kv_size(seq) / 2; i++) {
+			uint32_t s = blast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
+			sba += s > 0.8 * kv_at(ascore, i);
+		}
+		bench_end(ba);
+		print_bench(flag, "blast", bench_get(bl), bench_get(ba), sbl, sba);
 
+		#ifndef DEBUG
 			/* simdblast */
 			bench_init(sl);
 			bench_init(sa);
