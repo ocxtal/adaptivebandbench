@@ -16,6 +16,8 @@
 /**
  * @class char_vec
  */
+typedef uint64_t char_vec_reg;
+
 class char_vec {
 
 private:
@@ -29,12 +31,20 @@ public:
 	static uint64_t const LEN = sizeof(uint64_t);
 
 	/* constructors */
-	char_vec(void) {}
+	char_vec(void) {
+		set(0);
+	}
 	char_vec(int8_t k) {
 		set(k);
 	}
 	char_vec(uint64_t i) {
 		v = i;
+	}
+	char_vec(uint64_t const *p) {
+		v = *p;
+	}
+	char_vec(int8_t const *p) {
+		v = *((uint64_t *)p);
 	}
 
 	/* setter */
@@ -168,12 +178,20 @@ public:
 	static uint64_t const LEN = sizeof(__m128i) / sizeof(uint16_t);
 
 	/* constructors */
-	vec(void) {}
+	vec(void) {
+		set(0);
+	}
 	vec(uint16_t k) {
 		set(k);
 	}
 	vec(__m128i i) {
 		v = i;
+	}
+	vec(__m128i const *p) {
+		v = _mm_load_si128(p);
+	}
+	vec(uint16_t const *p) {
+		v = _mm_load_si128((__m128i const *)p);
 	}
 
 	/* setter */

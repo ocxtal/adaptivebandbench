@@ -4,8 +4,8 @@ CXX=g++
 CFLAGS=-Wall -std=c99 -O3 -msse4.1 -fopenmp
 CXXFLAGS=-Wall -std=gnu++11 -O3 -msse4.1 -fopenmp
 
-# BENCH_SRCS=main.cc aband.cc blast.cc simdblast.cc
-BENCH_SRCS=main.cc alinear.cc aaffine.cc blast.cc simdblast.cc
+BENCH_SRCS=main.cc aband.cc blast.cc simdblast.cc
+# BENCH_SRCS=main.cc alinear.cc aaffine.cc blast.cc simdblast.cc
 BENCH_MODULES=wave/DB.o wave/QV.o wave/align.o ssw.o parasail/cpuid.o parasail/io.o parasail/matrix_lookup.o parasail/memory.o parasail/memory_sse.o parasail/time.o sg_striped_sse41_128_16.o full.o
 
 all: recall bench
