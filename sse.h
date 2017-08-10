@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#define DEBUG2
 
 /**
  * @class char_vec
@@ -261,22 +262,50 @@ public:
 	inline vec operator<<=(int s) { return(operator=(operator<<(s))); }
 	inline vec operator>>=(int s) { return(operator=(operator>>(s))); }
 	/* array */
-	inline uint16_t operator[](uint64_t i) const {
-		if(i < 8) {
-			return((uint16_t)_mm_extract_epi16(v, i));
-		} else {
-			return(0);
-		}
+	inline uint16_t operator[](uint64_t const i) const {
+		#ifdef DEBUG2
+			switch(i) {
+				case 0: return((uint16_t)_mm_extract_epi16(v, 0));
+				case 1: return((uint16_t)_mm_extract_epi16(v, 1));
+				case 2: return((uint16_t)_mm_extract_epi16(v, 2));
+				case 3: return((uint16_t)_mm_extract_epi16(v, 3));
+				case 4: return((uint16_t)_mm_extract_epi16(v, 4));
+				case 5: return((uint16_t)_mm_extract_epi16(v, 5));
+				case 6: return((uint16_t)_mm_extract_epi16(v, 6));
+				case 7: return((uint16_t)_mm_extract_epi16(v, 7));
+				default: return(0);
+			}
+		#else
+			if(i < 8) {
+				return((uint16_t)_mm_extract_epi16(v, i));
+			} else {
+				return(0);
+			}
+		#endif
 	}
 	inline uint16_t lsb(void) const { return(operator[](0)); }
 	inline uint16_t center(void) const { return(operator[](4)); }
 	inline uint16_t msb(void) const { return(operator[](7)); }
-	inline uint16_t ins(uint16_t k, uint64_t i) {
-		if(i < 8) {
-			v = _mm_insert_epi16(v, k, i);
-		} else {
-			return(0);
-		}
+	inline uint16_t ins(uint16_t k, uint64_t const i) {
+		#ifdef DEBUG2
+			switch(i) {
+				case 0: v = _mm_insert_epi16(v, k, 0); return(k);
+				case 1: v = _mm_insert_epi16(v, k, 1); return(k);
+				case 2: v = _mm_insert_epi16(v, k, 2); return(k);
+				case 3: v = _mm_insert_epi16(v, k, 3); return(k);
+				case 4: v = _mm_insert_epi16(v, k, 4); return(k);
+				case 5: v = _mm_insert_epi16(v, k, 5); return(k);
+				case 6: v = _mm_insert_epi16(v, k, 6); return(k);
+				case 7: v = _mm_insert_epi16(v, k, 7); return(k);
+				default: return(0);
+			}
+		#else
+			if(i < 8) {
+				v = _mm_insert_epi16(v, k, i);
+			} else {
+				return(0);
+			}
+		#endif
 		return(k);
 	}
 
