@@ -65,6 +65,7 @@ int simdblast_affine(
 	int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt);
 	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
 
+
 int ddiag_linear(
 	void *work,
 	char const *a,
@@ -81,8 +82,6 @@ int ddiag_affine(
 	uint64_t blen,
 	int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt);
 	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
-
-
 
 /* wrapper of Myers' wavefront algorithm */
 extern "C" {
