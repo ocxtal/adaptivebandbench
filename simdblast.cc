@@ -35,7 +35,7 @@ simdblast_linear(
 	debug("%s, %s", a, b);
 
 	uint64_t i, a_size, first_a_index, last_a_index, a_index, b_index;
-	vec const gv(-ge), gv2(-2*ge), gv4(-4*ge), xtv(xt), zv(0), ofsv(OFS);
+	vec const gv(-ge), gv2(-2*ge), gv4(-4*ge), xtv(xt), zv, ofsv(OFS);
 	int16_t const acc_g[vec::LEN] __attribute__(( aligned(16) )) = {
 		(int16_t)(0),
 		(int16_t)(-ge),
@@ -193,7 +193,7 @@ simdblast_affine(
 
 	uint64_t i, a_size, first_a_index, last_a_index, a_index, b_index;
 	/* gvはaffine gap costにあわせて書き換える */
-	vec const xtv(xt), zv(0), ofsv(OFS);
+	vec const xtv(xt), zv, ofsv(OFS);
 	vec const giv(-gi), gev(-ge), gev2(-2*ge), gev4(-4*ge), gev8(-8*ge);
 	int16_t const acc_ge[vec::LEN] __attribute__(( aligned(16) )) = {
 		(int16_t)(0),
