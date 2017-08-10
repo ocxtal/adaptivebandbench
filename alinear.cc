@@ -411,7 +411,7 @@ int ddiag_linear(
 
 	struct sea_result *aln = (struct sea_result *)work;
 	aln->score = 0;
-	aln->ctx = NULL;
+//	aln->ctx = NULL;
 
 	void *base = (void *)(aln + 1);
 	memset(base, 0, 32 * 6 * sizeof(int16_t));

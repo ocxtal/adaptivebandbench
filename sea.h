@@ -217,7 +217,7 @@ struct sea_result {
 	sea_int_t alen;			/*!< alignment length on a. the alignment interval is a[apos]..a[apos+alen-1] */
 	sea_int_t bpos;			/*!< alignment start position on b. */
 	sea_int_t blen;			/*!< alignment length on b. the alignment interval is b[bpos]..b[bpos+blen-1] */
-	struct sea_context *ctx;/*!< a pointer to a alignment context structure. */
+	// struct sea_context *ctx;/*!< a pointer to a alignment context structure. */
 };
 
 typedef struct sea_result 		sea_result_t;

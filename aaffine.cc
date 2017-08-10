@@ -194,7 +194,7 @@ diag_affine_dynamic_banded_fill(
 	xdrop -= gi;					/** compensation */
 	VEC_SET(mv, m);					/** (m, m, m, ..., m) */
 	VEC_SET(xv, x);					/** (x, x, x, ..., x) */
-	VEC_SET(giv, gi);				/** (gi, gi, gi, ..., gi) */
+	VEC_SET(giv, gi + ge);			/** (gi, gi, gi, ..., gi) */
 	VEC_SET(gev, ge);				/** (ge, ge, ge, ..., ge) */
 	VEC_SET(maxv, CELL_MIN);		/** init max score vector with CELL_MIN */
 	VEC_SET(pv, CELL_MIN);			/** phantom vector at p = -1 */
@@ -464,7 +464,7 @@ int ddiag_affine(
 
 	struct sea_result *aln = (struct sea_result *)work;
 	aln->score = 0;
-	aln->ctx = NULL;
+//	aln->ctx = NULL;
 
 	void *base = (void *)(aln + 1);
 	memset(base, 0, 32 * 6 * sizeof(int16_t));
