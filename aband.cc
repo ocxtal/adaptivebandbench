@@ -321,7 +321,7 @@ ddiag_affine(
 		w[i/L].cv[i%L] = gi + (_Q(i) < 0 ? -_Q(i)-1 : _Q(i)) * (2*gi - sc_max) + OFS;
 		w[i/L].ce[i%L] = gi + (_Q(i) < 0 ? -_Q(i)-1 : _Q(i)+1) * (2*gi - sc_max) + OFS;
 		w[i/L].cf[i%L] = gi + (_Q(i) < 0 ? -_Q(i) : _Q(i)) * (2*gi - sc_max) + OFS;
-		debug("pv(%d), cv(%d)", w.pv[i], w.cv[i]);
+		debug("pv(%d), cv(%d)", w[i/L].pv[i%L], w[i/L].cv[i%L]);
 	}
 	#undef _Q
 
@@ -343,9 +343,9 @@ ddiag_affine(
 	}
 
 	/* init maxv */
-	for(uint64_t i = 0; i < (uint64_t)BW; i++) {
+	for(uint64_t i = 0; i < (uint64_t)BW/L; i++) {
 		vec t(w[i].pv);
-		t.store(w[i/L].max);
+		t.store(w[i].max);
 	}
 
 	/* direction determiner */
@@ -358,8 +358,8 @@ ddiag_affine(
 	// vec mv(m), xv(x), giv(-gi), gev(-ge);
 	vec smv, giv(-gi), gev(-ge); smv.load(score_matrix);
 	for(uint64_t p = 0; p < (uint64_t)(alen+blen-1); p++) {
-		debug("%lld, %d, %d", dir, w.cv[BW-1], w.cv[0]);
-		dir = dir_trans[w[BW/L].cv[L-1] > w[0].cv[0]][dir];
+		debug("%lld, %d, %d", dir, w[BW/L-1].cv[L-1], w[0].cv[0]);
+		dir = dir_trans[w[BW/L-1].cv[L-1] > w[0].cv[0]][dir];
 
 		// dump(w.pv, sizeof(uint16_t) * BW);
 		// dump(w.cv, sizeof(uint16_t) * BW);
@@ -378,7 +378,7 @@ ddiag_affine(
 				for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
 					debug("loop: %llu", i);
 					char_vec va(w[i].a);
-					char_vec tb(w[(i+1)].b);
+					char_vec tb(w[i+1].b);
 					char_vec vb = tb.dsr(cb);
 					cb = tb; vb.store(w[i].b);
 
@@ -387,18 +387,18 @@ ddiag_affine(
 
 					/* load pv */
 					// vec vd; vd.load(&w.pv[L*i]);
-					vec td(w[(i+1)].pv);
+					vec td(w[i+1].pv);
 					vec vd = td.dsr(cd);
 					cd = td;
 
 					/* load v and h */
-					vec th(w[(i+1)].cv);
+					vec th(w[i+1].cv);
 					vec vv = ch; ch.store(w[i].pv);
 					vec vh = th.dsr(ch);
 					ch = th;
 
 					/* load f and e */
-					vec te(w[(i+1)].ce);
+					vec te(w[i+1].ce);
 					vec vf(w[i].cf);
 					vec ve = te.dsr(ce);
 					ce = te;
@@ -428,7 +428,7 @@ ddiag_affine(
 				for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
 					debug("loop: %llu", i);
 					char_vec va(w[i].a);
-					char_vec tb(w[(i+1)].b);
+					char_vec tb(w[i+1].b);
 					char_vec vb = tb.dsr(cb);
 					cb = tb; vb.store(w[i].b);
 
@@ -439,13 +439,13 @@ ddiag_affine(
 					vec vd(w[i].pv);
 
 					/* load v and h */
-					vec th(w[(i+1)].cv);
+					vec th(w[i+1].cv);
 					vec vv = ch; ch.store(w[i].pv);
 					vec vh = th.dsr(ch);
 					ch = th;
 
 					/* load f and e */
-					vec te(w[(i+1)].ce);
+					vec te(w[i+1].ce);
 					vec vf(w[i].cf);
 					vec ve = te.dsr(ce);
 					ce = te;
@@ -519,29 +519,29 @@ ddiag_affine(
 				vec cd(-sc_min);
 				for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
 					debug("loop: %llu", i);
-					char_vec ta;(w[i].a);
+					char_vec ta(w[i].a);
 					char_vec va = ta.dsl(ca);
-					char_vec vb;(w[i].b);
+					char_vec vb(w[i].b);
 					ca = ta; va.store(w[i].a);
 
 					// vec scv = vec::comp(va, vb).select(m, x);
 					vec scv = smv.shuffle(va | vb);
 
 					/* load pv */
-					// vec vd;(w.pv[L*i]);
-					vec td;(w[i].pv);
+					// vec vd(w.pv[L*i]);
+					vec td(w[i].pv);
 					vec vd = td.dsl(cd);
 					cd = td;
 
 					/* load v and h */
-					vec tv;(w[i].cv);
+					vec tv(w[i].cv);
 					vec vh = tv; tv.store(w[i].pv);
 					vec vv = tv.dsl(cv);
 					cv = tv;
 
 					/* load f and e */
-					vec ve;(w[i].ce);
-					vec tf;(w[i].cf);
+					vec ve(w[i].ce);
+					vec tf(w[i].cf);
 					vec vf = tf.dsl(cf);
 					cf = tf;
 
@@ -563,13 +563,16 @@ ddiag_affine(
 		}
 		ptr += BW;
 
-		if(w[BW/2/L].cv[0] < w[BW/2/L].max[0] - xt) { break; }
+		if(w[BW/2/L].cv[0] < w[BW/2/L].max[0] - xt) {
+			debug("xdrop");
+			break;
+		}
 	}
 	// free(mat);
 
 	int32_t max = 0;
 	for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
-		vec t(w[L*i].max);
+		vec t(w[i].max);
 		debug("%d", t.hmax());
 		if(t.hmax() > max) { max = t.hmax(); }
 	}
