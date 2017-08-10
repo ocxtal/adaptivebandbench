@@ -242,12 +242,9 @@ diag_linear_dynamic_banded_fill(
 	o.e.p = COP(i, j); o.e.q = COQ(i, j);	/** e.q == 0; */
 	if(ALG != NW) {
 		VEC_STORE(mat, maxv);
-		VEC_ASSIGN(tmp1, maxv);
-		for(i = 1; i < bw; i++) {
-			VEC_SHIFT_R(tmp1);
-			VEC_MAX(maxv, tmp1, maxv);		/** extract maximum score in the maxv vector */
-		}
-		VEC_STORE(mat, maxv);				/** store max vector at the end of the memory */
+		int16_t max;
+		VEC_HMAX(max, maxv);
+		*((int16_t *)mat) = max;
 	}
 	return(o);
 }

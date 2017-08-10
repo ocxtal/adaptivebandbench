@@ -1,8 +1,8 @@
 
 CC=gcc
 CXX=g++
-CFLAGS=-Wall -std=c99 -g -msse4.1 -fopenmp
-CXXFLAGS=-Wall -std=gnu++11 -g -msse4.1 -fopenmp
+CFLAGS=-Wall -std=c99 -O3 -msse4.1 -fopenmp
+CXXFLAGS=-Wall -std=gnu++11 -O3 -msse4.1 -fopenmp
 
 # BENCH_SRCS=main.cc aband.cc blast.cc simdblast.cc
 BENCH_SRCS=main.cc alinear.cc aaffine.cc blast.cc simdblast.cc

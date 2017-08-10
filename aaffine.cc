@@ -194,7 +194,7 @@ diag_affine_dynamic_banded_fill(
 	xdrop -= gi;					/** compensation */
 	VEC_SET(mv, m);					/** (m, m, m, ..., m) */
 	VEC_SET(xv, x);					/** (x, x, x, ..., x) */
-	VEC_SET(giv, gi + ge);			/** (gi, gi, gi, ..., gi) */
+	VEC_SET(giv, gi + ge);				/** (gi, gi, gi, ..., gi) */
 	VEC_SET(gev, ge);				/** (ge, ge, ge, ..., ge) */
 	VEC_SET(maxv, CELL_MIN);		/** init max score vector with CELL_MIN */
 	VEC_SET(pv, CELL_MIN);			/** phantom vector at p = -1 */
@@ -274,12 +274,9 @@ diag_affine_dynamic_banded_fill(
 	o.e.p = COP(i, j); o.e.q = COQ(i, j);		/** o.e.q == 0 */
 	if(ALG != NW) {
 		VEC_STORE(mat, maxv);					/** store max vector at the end of the memory */
-		VEC_ASSIGN(tmp1, maxv);
-		for(i = 1; i < bw; i++) {
-			VEC_SHIFT_R(tmp1);
-			VEC_MAX(maxv, tmp1, maxv);			/** extract maximum score in the maxv vector */ 
-		}
-		VEC_STORE(mat, maxv);					/** store max of the max vector */
+		int16_t max;
+		VEC_HMAX(max, maxv);
+		*((int16_t *)mat) = max;
 	}
 	return(o);
 }

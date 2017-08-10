@@ -161,6 +161,16 @@
 	(a##4) = _mm_min_epi16((b##4), (c##4)); \
 }
 
+#define VEC_HMAX(a, b) { \
+	(b##1) = _mm_max_epi16((b##1), (b##2)); \
+	(b##3) = _mm_max_epi16((b##3), (b##4)); \
+	(b##1) = _mm_max_epi16((b##1), (b##3)); \
+	(b##1) = _mm_max_epi16((b##1), _mm_srli_si128((b##1), 8)); \
+	(b##1) = _mm_max_epi16((b##1), _mm_srli_si128((b##1), 4)); \
+	(b##1) = _mm_max_epi16((b##1), _mm_srli_si128((b##1), 2)); \
+	(a) = (signed short)_mm_extract_epi16((b##1), 0); \
+}
+
 /**
  * shift operations
  */
@@ -219,7 +229,7 @@
 
 #define VEC_CHAR_SHIFT_L(a) { \
 	(a##2) = _mm_alignr_epi8((a##2), (a##1), 15); \
-	(a##1) = _mm_slli_si128((a##1), 15); \
+	(a##1) = _mm_slli_si128((a##1), 1); \
 }
 
 #define VEC_CHAR_INSERT_MSB(x, y) { \
