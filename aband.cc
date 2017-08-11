@@ -41,14 +41,14 @@ ddiag_linear(
 	int8_t sc_max = extract_max_score(score_matrix);
 	int8_t sc_min = extract_min_score(score_matrix);
 
+	uint64_t const L = vec::LEN;
 	struct _w {
 		int8_t b[vec::LEN];
 		int8_t a[vec::LEN];
 		uint16_t pv[vec::LEN];
 		uint16_t cv[vec::LEN];
 		uint16_t max[vec::LEN];
-	} w __attribute__(( aligned(16) ));
-	uint64_t const L = vec::LEN;
+	} w[BW/L+1] __attribute__(( aligned(16) ));
 
 	/* init char vec */
 	for(uint64_t i = 0; i < (uint64_t)BW/2; i++) {
@@ -110,9 +110,9 @@ ddiag_linear(
 				debug("DD");
 				w[BW/L].b[0] = encode_b(b[bpos++]);
 
-				char_vec cb(.b);
-				vec ch(.cv);
-				vec cd(.pv);
+				char_vec cb(w[0].b);
+				vec ch(w[0].cv);
+				vec cd(w[0].pv);
 				for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
 					debug("loop: %llu", i);
 					char_vec va(w[i].a);
@@ -147,8 +147,8 @@ ddiag_linear(
 				debug("RD");
 				w[BW/L].b[0] = encode_b(b[bpos++]);
 
-				char_vec cb(.b);
-				vec ch(.cv);
+				char_vec cb(w[0].b);
+				vec ch(w[0].cv);
 				for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
 					debug("loop: %llu", i);
 					char_vec va(w[i].a);
@@ -296,6 +296,7 @@ ddiag_affine(
 		uint16_t max[BW];
 	} w __attribute__(( aligned(16) ));
 	*/
+	uint64_t const L = vec::LEN;
 	struct _w {
 		int8_t b[vec::LEN];
 		int8_t a[vec::LEN];
@@ -304,8 +305,7 @@ ddiag_affine(
 		uint16_t ce[vec::LEN];
 		uint16_t cf[vec::LEN];
 		uint16_t max[vec::LEN];
-	} w[BW+1] __attribute__(( aligned(16) ));
-	uint64_t const L = vec::LEN;
+	} w[BW/L+1] __attribute__(( aligned(16) ));
 
 
 	/* init char vec */
