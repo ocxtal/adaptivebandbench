@@ -26,6 +26,7 @@
 #  define XDROP				( 80 )
 #endif
 
+// #define OMIT_SCORE			1
 #define PARASAIL_SCORE		1
 #define RECALL_THRESH		1
 // #define DEBUG_PATH
@@ -425,19 +426,25 @@ int main(int argc, char *argv[])
 		/* collect scores with full-sized dp */
 		kv_reserve(ascore, kv_size(seq) / 2);
 
-		#ifdef PARASAIL_SCORE
-			parasail_matrix_t *_matrix = parasail_matrix_create("ACGT", M, -X);
-			#pragma omp parallel for
-			for(i = 0; i < kv_size(seq) / 2; i++) {
-				parasail_result *r = parasail_sg_striped_sse41_128_16(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), -gi-ge, -ge, _matrix);
-				kv_at(ascore, i) = r->score;
-				parasail_result_free(r);
-			}
+		#ifndef OMIT_SCORE
+			#ifdef PARASAIL_SCORE
+				parasail_matrix_t *_matrix = parasail_matrix_create("ACGT", M, -X);
+				#pragma omp parallel for
+				for(i = 0; i < kv_size(seq) / 2; i++) {
+					parasail_result *r = parasail_sg_striped_sse41_128_16(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), -gi-ge, -ge, _matrix);
+					kv_at(ascore, i) = r->score;
+					parasail_result_free(r);
+				}
+			#else
+				#pragma omp parallel for
+				for(i = 0; i < kv_size(seq) / 2; i++) {
+					sw_result_t a = sw_affine(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge);
+					kv_at(ascore, i) = a.score;
+				}
+			#endif
 		#else
-			#pragma omp parallel for
 			for(i = 0; i < kv_size(seq) / 2; i++) {
-				sw_result_t a = sw_affine(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge);
-				kv_at(ascore, i) = a.score;
+				kv_at(ascore, i) = 0;
 			}
 		#endif
 
