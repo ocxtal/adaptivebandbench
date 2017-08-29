@@ -27,6 +27,7 @@
 #endif
 
 #define PARASAIL_SCORE		1
+#define RECALL_THRESH		1
 // #define DEBUG_PATH
 // #define DEBUG_BLAST			1
 
@@ -446,10 +447,10 @@ int main(int argc, char *argv[])
 		bench_start(ba);
 		for(i = 0; i < kv_size(seq) / 2; i++) {
 			uint32_t s = blast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
-			sba += s > 0.8 * kv_at(ascore, i);
+			sba += s >= RECALL_THRESH * kv_at(ascore, i);
 
 			#if defined(DEBUG_PATH) && defined(DEBUG_BLAST)
-			if(s <= 0.8 * kv_at(ascore, i)) {
+			if(s < RECALL_THRESH * kv_at(ascore, i)) {
 				sw_result_t a = sw_affine(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge);
 				print_alignment(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), a.path);
 				free(a.path);
@@ -466,7 +467,7 @@ int main(int argc, char *argv[])
 			bench_start(sa);
 			for(i = 0; i < kv_size(seq) / 2; i++) {
 				uint32_t s = simdblast_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
-				ssa += s > 0.8 * kv_at(ascore, i);
+				ssa += s >= RECALL_THRESH * kv_at(ascore, i);
 			}
 			bench_end(sa);
 			print_bench(flag, "simdblast", bench_get(sl), bench_get(sa), ssl, ssa);
@@ -478,10 +479,10 @@ int main(int argc, char *argv[])
 		bench_start(dda);
 		for(i = 0; i < kv_size(seq) / 2; i++) {
 			uint32_t s = ddiag_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
-			sdda += s > 0.8 * kv_at(ascore, i);
+			sdda += s >= RECALL_THRESH * kv_at(ascore, i);
 
 			#if defined(DEBUG_PATH) && !defined(DEBUG_BLAST)
-			if(s <= 0.8 * kv_at(ascore, i)) {
+			if(s < RECALL_THRESH * kv_at(ascore, i)) {
 				sw_result_t a = sw_affine(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge);
 				print_alignment(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), a.path);
 				free(a.path);
@@ -500,7 +501,7 @@ int main(int argc, char *argv[])
 				bench_start(wl);
 				for(i = 0; i < kv_size(seq) / 2; i++) {
 					uint32_t l = wavefront(wwork, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1));
-					swl += l > 0.8 * (kv_at(len, i * 2) + kv_at(len, i * 2 + 1));
+					swl += l >= RECALL_THRESH * (kv_at(len, i * 2) + kv_at(len, i * 2 + 1));
 				}
 				bench_end(wl);
 			}
@@ -514,7 +515,7 @@ int main(int argc, char *argv[])
 				bench_start(pa);
 				parasail_result *r = parasail_sg_striped_sse41_128_16(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), -gi-ge, -ge, matrix);
 				bench_end(pa);
-				spa += r->score > 0.8 * kv_at(ascore, i);
+				spa += r->score >= RECALL_THRESH * kv_at(ascore, i);
 				parasail_result_free(r);
 			}
 			print_bench(flag, "parasail", bench_get(bl), bench_get(pa), 0, spa);
@@ -536,7 +537,7 @@ int main(int argc, char *argv[])
 				s_align *r = ssw_align(sp, (int8_t *)kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), -gi, -ge, 8, 0, 0, 30);
 				bench_end(fa);
 
-				sfa += r->score1 > 0.8 * kv_at(ascore, i);
+				sfa += r->score1 >= RECALL_THRESH * kv_at(ascore, i);
 				align_destroy(r);
 				init_destroy(sp);
 			}
