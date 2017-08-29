@@ -28,7 +28,7 @@
 
 // #define OMIT_SCORE			1
 #define PARASAIL_SCORE		1
-#define RECALL_THRESH		1
+#define RECALL_THRESH		0.95
 // #define DEBUG_PATH
 // #define DEBUG_BLAST			1
 
@@ -238,6 +238,26 @@ char *mseq(char const *seq, int x, int ins, int del)
 	return(mod);
 }
 
+void revcomp(char *seq, int len)
+{
+	char map[32] = {
+		0, 'T' & 0x1f, 0, 'G' & 0x1f, 0, 0, 0, 'C' & 0x1f, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 'A' & 0x1f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	};
+
+	/* in-place revcomp */
+	char *p = seq, *q = &seq[len - 1];
+	while(p < q) {
+		char t = *p;
+		*p = map[*q & 0x1f] | (*q & ~0x1f);
+		*q = map[t & 0x1f] | (t & ~0x1f);
+		p++; q--;
+	}
+
+	if(p == q) { *p = map[*p]; }
+	return;
+}
+
 int print_msg(int flag, char const *fmt, ...)
 {
 	int r = 0;
@@ -403,6 +423,10 @@ int main(int argc, char *argv[])
 		while((c = getchar()) != EOF) {
 			if(c == '\n') {
 				uint64_t l = MIN2(max_len, kv_size(buf) - base);
+				if(kv_size(seq) & 0x02) {
+					revcomp((char *)&kv_at(buf, base), kv_size(buf) - base);
+				}
+
 				for(i = 0; i < rl; i++) {
 					kv_push(buf, rbase());
 				}
