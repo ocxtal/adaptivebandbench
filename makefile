@@ -39,6 +39,12 @@ bench.32: bench.modules
 bench.64: bench.modules
 	$(CXX) $(CXXFLAGS) -o bin/bench.64 -DBW=64 -DBENCH $(BENCH_SRCS) $(BENCH_MODULES)
 
+bench.96: bench.modules
+	$(CXX) $(CXXFLAGS) -o bin/bench.96 -DBW=96 -DBENCH $(BENCH_SRCS) $(BENCH_MODULES)
+
+bench.128: bench.modules
+	$(CXX) $(CXXFLAGS) -o bin/bench.128 -DBW=128 -DBENCH $(BENCH_SRCS) $(BENCH_MODULES)
+
 bench.aband.32: bench.modules
 	$(CXX) $(CXXFLAGS) -o bin/bench.aband.32 -DBW=32 -DDEBUG_PATH -DBENCH $(BENCH_SRCS) $(BENCH_MODULES)
 

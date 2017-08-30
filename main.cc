@@ -21,14 +21,14 @@
 #define GI 					( 1 )
 #define GE 					( 1 )
 #if defined(BW) && BW == 32
-#  define XDROP				( 40 )
+#  define XDROP				( 100 )
 #else
-#  define XDROP				( 80 )
+#  define XDROP				( 100 )
 #endif
 
 // #define OMIT_SCORE			1
 #define PARASAIL_SCORE		1
-#define RECALL_THRESH		0.95
+#define RECALL_THRESH		1
 // #define DEBUG_PATH
 // #define DEBUG_BLAST			1
 
@@ -522,6 +522,18 @@ int main(int argc, char *argv[])
 		}
 		bench_end(dda);
 		print_bench(flag, "aband", bench_get(ddl), bench_get(dda), sddl, sdda);
+
+		int xtable[9] = { 20, 40, 60, 80, 100, 120, 140, 160, 180 };
+		for(uint64_t k = 0; k < 9; k++) {
+			sdda = 0;
+			for(i = 0; i < kv_size(seq) / 2; i++) {
+				uint32_t s = ddiag_affine(work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xtable[k]);
+				sdda += s >= RECALL_THRESH * kv_at(ascore, i);
+			}
+			printf("%llu\t%lld\n", xtable[k], sdda);
+		}
+
+
 
 		#ifndef DEBUG_PATH
 			/* wavefront */
