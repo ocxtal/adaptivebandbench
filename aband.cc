@@ -13,6 +13,9 @@
 #define BW		( 32 )
 #endif
 
+#define cat_name(x, y)			x##_##y
+#define export_name(x, y)		cat_name(x, y)
+
 #define MIN 	( 0 )
 #define OFS 	( 32768 )
 
@@ -20,7 +23,7 @@
  * @fn ddiag_linear
  */
 int
-ddiag_linear(
+export_name(ddiag_linear, BW)(
 	void *work,
 	char const *a,
 	uint64_t alen,
@@ -258,7 +261,7 @@ ddiag_linear(
  * @fn ddiag_affine
  */
 int
-ddiag_affine(
+export_name(ddiag_affine, BW)(
 	void *work,
 	char const *a,
 	uint64_t alen,
