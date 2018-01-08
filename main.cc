@@ -28,14 +28,6 @@
 // #define DEBUG_PATH
 // #define DEBUG_BLAST			1
 
-int blast_linear(
-	void *work,
-	char const *a,
-	uint64_t alen,
-	char const *b,
-	uint64_t blen,
-	int8_t *score_matrix, int8_t ge, int16_t xt);
-	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
 int blast_affine(
 	void *work,
 	char const *a,
@@ -43,16 +35,7 @@ int blast_affine(
 	char const *b,
 	uint64_t blen,
 	int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt);
-	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
 
-int simdblast_linear(
-	void *work,
-	char const *a,
-	uint64_t alen,
-	char const *b,
-	uint64_t blen,
-	int8_t *score_matrix, int8_t ge, int16_t xt);
-	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
 int simdblast_affine(
 	void *work,
 	char const *a,
@@ -65,13 +48,6 @@ int simdblast_affine(
 #define cat_name(x, y)			x##_##y
 #define export_name(x, y)		cat_name(x, y)
 #define ddiag_decl(_bw) \
-	int export_name(ddiag_linear, _bw)( \
-		void *work, \
-		char const *a, \
-		uint64_t alen, \
-		char const *b, \
-		uint64_t blen, \
-		int8_t *score_matrix, int8_t ge, int16_t xt); \
 	int export_name(ddiag_affine, _bw)( \
 		void *work, \
 		char const *a, \
@@ -359,16 +335,10 @@ int main(int argc, char *argv[])
 
 		print_msg(flag, "len:\t%d\ncnt:\t%d\n", len, cnt);
 		print_msg(flag, "m: %d\tx: %d\tgi: %d\tge: %d\n", m, x, gi, ge);
-		print_msg(flag, "alg\tlinear\taffine\tsc(l)\tsc(a)\n");
+		print_msg(flag, "alg\taffine\tsc(l)\tsc(a)\n");
 
 		/* blast */
-		bench_init(bl);
 		bench_init(ba);
-		bench_start(bl);
-		for(i = 0; i < cnt; i++) {
-			sbl += blast_linear(work, a, strlen(a), b, strlen(b), score_matrix, ge, xt);
-		}
-		bench_end(bl);
 		bench_start(ba);
 		for(i = 0; i < cnt; i++) {
 			sba += blast_affine(work, a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
@@ -377,13 +347,7 @@ int main(int argc, char *argv[])
 		print_bench(flag, "blast", xt, bench_get(bl), bench_get(ba), sbl, sba);
 
 		/* simdblast */
-		bench_init(sl);
 		bench_init(sa);
-		bench_start(sl);
-		for(i = 0; i < cnt; i++) {
-			ssl += simdblast_linear(work, a, strlen(a), b, strlen(b), score_matrix, ge, xt);
-		}
-		bench_end(sl);
 		bench_start(sa);
 		for(i = 0; i < cnt; i++) {
 			ssa += simdblast_affine(work, a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
@@ -393,13 +357,7 @@ int main(int argc, char *argv[])
 
 
 		/* adaptive banded */
-		bench_init(ddl);
 		bench_init(dda);
-		bench_start(ddl);
-		for(i = 0; i < cnt; i++) {
-			sddl += ddiag_linear_32(work, a, strlen(a), b, strlen(b), score_matrix, ge, xt);
-		}
-		bench_end(ddl);
 		bench_start(dda);
 		for(i = 0; i < cnt; i++) {
 			sdda += ddiag_affine_32(work, a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
