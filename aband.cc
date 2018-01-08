@@ -20,244 +20,6 @@
 #define OFS 	( 32768 )
 
 /**
- * @fn ddiag_linear
- */
-int
-export_name(ddiag_linear, BW)(
-	void *work,
-	char const *a,
-	uint64_t alen,
-	char const *b,
-	uint64_t blen,
-	int8_t *score_matrix, int8_t ge, int16_t xt)
-//	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
-{
-	if(alen == 0 || blen == 0) { return(0); }
-	debug("%s, %s", a, b);
-
-	// uint16_t *mat = (uint16_t *)aligned_malloc(
-		// (alen+blen-1) * BW * sizeof(uint16_t),
-		// sizeof(__m128i));
-	uint16_t *ptr = (uint16_t *)work;
-
-	/* extract max and min */
-	int8_t sc_max = extract_max_score(score_matrix);
-	int8_t sc_min = extract_min_score(score_matrix);
-
-	uint64_t const L = vec::LEN;
-	struct _w {
-		int8_t b[vec::LEN];
-		int8_t a[vec::LEN];
-		uint16_t pv[vec::LEN];
-		uint16_t cv[vec::LEN];
-		uint16_t max[vec::LEN];
-	} w[BW/L+1] __attribute__(( aligned(16) ));
-
-	/* init char vec */
-	for(uint64_t i = 0; i < (uint64_t)BW/2; i++) {
-		w[(BW/2 + i)/L].a[(BW/2 + i)%L] = 0x80;
-		w[i/L].b[i%L] = 0xff;
-	}
-	for(uint64_t i = 0; i < (uint64_t)BW/2; i++) {
-		w[(BW/2 - i - 1)/L].a[(BW/2 - i - 1)%L] = encode_a(a[i]);
-		w[(BW/2 + i)/L].b[(BW/2 + i)%L] = encode_b(b[i]);
-	}
-
-	/* init vec */
-	#define _Q(x)		( (x) - BW/2 )
-	for(int i = 0; i < (int)BW; i++) {
-		w[i/L].pv[i%L] =      (_Q(i) < 0 ? -_Q(i)   : _Q(i)) * (2*ge - sc_max) + OFS;
-		w[i/L].cv[i%L] = ge + (_Q(i) < 0 ? -_Q(i)-1 : _Q(i)) * (2*ge - sc_max) + OFS;
-		debug("pv(%d), cv(%d)", w[i/L].pv[i%L], w[i/L].cv[i%L]);
-	}
-	#undef _Q
-
-	/* init pad */
-	/*
-	for(uint64_t i = 0; i < 8; i++) {
-		w.pad1[i] = 0; w.pad2[i] = -sc_min; w.pad3[i] = -ge;
-	}
-	*/
-	for(uint64_t i = 0; i < 8; i++) {
-		w[BW/L].b[i] = 0;
-		w[BW/L].a[i] = 0;
-		w[BW/L].pv[i] = -sc_min;
-		w[BW/L].cv[i] = -ge;
-	}
-
-	/* init maxv */
-	for(uint64_t i = 0; i < (uint64_t)BW/L; i++) {
-		vec t(w[i].pv);
-		t.store(w[i].max);
-	}
-
-	/* direction determiner */
-	uint64_t const RR = 0, RD = 1, DR = 2, DD = 3;
-	uint64_t const dir_trans[2][4] = {{RR, DR, RR, DR}, {RD, DD, RD, DD}};
-	uint64_t dir = w[BW/L-1].pv[L-1] <= w[0].pv[0] ? RR : RD;
-	debug("%u, %u", w[BW/L].pv[L-1], w[0].pv[0]);
-
-	uint64_t apos = BW/2;
-	uint64_t bpos = BW/2;
-	// vec mv(m), xv(x), giv(-gi);
-	vec smv, gev(-ge); smv.load(score_matrix);
-	for(uint64_t p = 0; p < (uint64_t)(alen+blen-1); p++) {
-		debug("%lld, %d, %d", dir, w[BW/L-1].cv[L-1], w[0].cv[0]);
-		dir = dir_trans[w[BW/L-1].cv[L-1] > w[0].cv[0]][dir];
-
-		// dump(w.pv, sizeof(uint16_t) * BW);
-		// dump(w.cv, sizeof(uint16_t) * BW);
-
-		switch(dir & 0x03) {
-			case DD: {
-				debug("DD");
-				w[BW/L].b[0] = encode_b(b[bpos++]);
-
-				char_vec cb(w[0].b);
-				vec ch(w[0].cv);
-				vec cd(w[0].pv);
-				for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
-					debug("loop: %llu", i);
-					char_vec va(w[i].a);
-					char_vec tb(w[i+1].b);
-					char_vec vb = tb.dsr(cb);
-					cb = tb; vb.store(w[i].b);
-
-					// vec scv = vec::comp(va, vb).select(mv, xv);
-					vec scv = smv.shuffle(va | vb);
-
-					/* load diag */
-					// vec vd(w[i].pv);
-					vec td(w[i+1].pv);
-					vec vd = td.dsr(cd);
-					cd = td;
-
-					/* load horizontal and vertical */
-					vec th(w[i+1].cv);
-					vec vv = ch; ch.store(w[i].pv);
-					vec vh = th.dsr(ch);
-					ch = th;
-
-					vec nv = vec::max(vec::max(vh, vv) - gev, vd + scv);
-					nv.store(w[i].cv);
-					nv.store(ptr);
-
-					vec t(w[i].max); t = vec::max(t, nv);
-					t.store(w[i].max);
-				}
-			} break;
-			case RD: {
-				debug("RD");
-				w[BW/L].b[0] = encode_b(b[bpos++]);
-
-				char_vec cb(w[0].b);
-				vec ch(w[0].cv);
-				for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
-					debug("loop: %llu", i);
-					char_vec va(w[i].a);
-					char_vec tb(w[i+1].b);
-					char_vec vb = tb.dsr(cb);
-					cb = tb; vb.store(w[i].b);
-
-					// vec scv = vec::comp(va, vb).select(mv, xv);
-					vec scv = smv.shuffle(va | vb);
-
-					vec vd(w[i].pv);
-					vec th(w[i+1].cv);
-					vec vv = ch; ch.store(w[i].pv);
-					vec vh = th.dsr(ch);
-					ch = th;
-
-					vec nv = vec::max(vec::max(vh, vv) - gev, vd + scv);
-					nv.store(w[i].cv);
-					nv.store(ptr);
-
-					vec t(w[i].max); t = vec::max(t, nv);
-					t.store(w[i].max);
-				}
-			} break;
-			case DR: {
-				debug("DR");
-
-				char_vec ca(encode_a(a[apos++]));
-				vec cv(-ge);
-				for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
-					debug("loop: %llu", i);
-					char_vec ta(w[i].a);
-					char_vec va = ta.dsl(ca);
-					char_vec vb(w[i].b);
-					ca = ta; va.store(w[i].a);
-
-					// vec scv = vec::comp(va, vb).select(m, x);
-					vec scv = smv.shuffle(va | vb);
-
-					vec vd(w[i].pv);
-					vec tv(w[i].cv);
-					vec vh = tv; tv.store(w[i].pv);
-					vec vv = tv.dsl(cv);
-					cv = tv;
-
-					vec nv = vec::max(vec::max(vh, vv) - gev, vd + scv);
-					nv.store(w[i].cv);
-					nv.store(ptr);
-
-					vec t(w[i].max); t = vec::max(t, nv);
-					t.store(w[i].max);
-				}
-			} break;
-			case RR: {
-				debug("RR");
-
-				char_vec ca(encode_a(a[apos++]));
-				vec cv(-ge);
-				vec cd(-sc_min);
-				for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
-					debug("loop: %llu", i);
-					char_vec ta(w[i].a);
-					char_vec va = ta.dsl(ca);
-					char_vec vb(w[i].b);
-					ca = ta; va.store(w[i].a);
-
-					// vec scv = vec::comp(va, vb).select(m, x);
-					vec scv = smv.shuffle(va | vb);
-
-					/* load diag */
-					// vec vd(w[i].pv);
-					vec td(w[i].pv);
-					vec vd = td.dsl(cd);
-					cd = td;
-
-					/* load horizontal and vertical */
-					vec tv(w[i].cv);
-					vec vh = tv; tv.store(w[i].pv);
-					vec vv = tv.dsl(cv);
-					cv = tv;
-
-					vec nv = vec::max(vec::max(vh, vv) - gev, vd + scv);
-					nv.store(w[i].cv);
-					nv.store(ptr);
-
-					vec t(w[i].max); t = vec::max(t, nv);
-					t.store(w[i].max);
-				}
-			} break;
-		}
-		ptr += BW;
-
-		if(w[BW/2/L].cv[0] < w[BW/2/L].max[0] - xt) { break; }
-	}
-	// free(mat);
-
-	int32_t max = 0;
-	for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
-		vec t(w[i].max);
-		debug("%d", t.hmax());
-		if(t.hmax() > max) { max = t.hmax(); }
-	}
-	return(max - OFS);
-}
-
-/**
  * @fn ddiag_affine
  */
 int
@@ -268,14 +30,10 @@ export_name(ddiag_affine, BW)(
 	char const *b,
 	uint64_t blen,
 	int8_t score_matrix[16], int8_t gi, int8_t ge, int16_t xt)
-//	int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
 {
 	if(alen == 0 || blen == 0) { return(0); }
 	debug("%s, %s", a, b);
 
-	// uint16_t *mat = (uint16_t *)aligned_malloc(
-		// (alen+blen-1) * 3 * BW * sizeof(uint16_t),
-		// sizeof(__m128i));
 	uint16_t *ptr = (uint16_t *)work;
 
 	/* extract max and min */
@@ -284,21 +42,6 @@ export_name(ddiag_affine, BW)(
 	/* fix gap open penalty */
 	gi += ge;
 
-	/*
-	struct _w {
-		int8_t b[BW];
-		int8_t pad1[vec::SIZE];
-		int8_t a[BW];
-		uint16_t pv[BW];
-		uint16_t pad2[vec::LEN];
-		uint16_t cv[BW];
-		uint16_t pad3[vec::LEN];
-		uint16_t ce[BW];
-		uint16_t pad4[vec::LEN];
-		uint16_t cf[BW];
-		uint16_t max[BW];
-	} w __attribute__(( aligned(16) ));
-	*/
 	uint64_t const L = vec::LEN;
 	struct _w {
 		int8_t b[vec::LEN];
@@ -333,12 +76,6 @@ export_name(ddiag_affine, BW)(
 	#undef _Q
 
 	/* init pad */
-	/*
-	for(uint64_t i = 0; i < 8; i++) {
-		w.pad1[i] = 0; w.pad2[i] = -sc_min;
-		w.pad3[i] = -gi; w.pad4[i] = -ge;
-	}
-	*/
 	for(uint64_t i = 0; i < L; i++) {
 		w[BW/L].b[i] = 0;
 		w[BW/L].a[i] = 0;
@@ -575,7 +312,6 @@ export_name(ddiag_affine, BW)(
 			break;
 		}
 	}
-	// free(mat);
 
 	int32_t max = 0;
 	for(uint64_t i = 0; i < (uint64_t)(BW / L); i++) {
@@ -607,27 +343,17 @@ int main_ext(int argc, char *argv[])
 
 	void *work = aligned_malloc(128 * 1024 * 1024, 16);
 
-	if(strcmp(argv[1], "linear") == 0) {
-		int score = ddiag_linear(
-			work,
-			a, alen, b, blen,
-			score_matrix,
-			atoi(argv[6]),
-			atoi(argv[7]));
-		printf("%d\n", score);
-	} else if(strcmp(argv[1], "affine") == 0) {
-		int score = ddiag_affine(
-			work,
-			a, alen, b, blen,
-			score_matrix,
-			atoi(argv[6]),
-			atoi(argv[7]),
-			atoi(argv[8]));
-		printf("%d\n", score);
-	} else {
-		printf("./a.out linear AAA AAA 2 -3 -5 -1 30\n");
+	if(0) {
+		printf("./a.out AAA AAA 2 -3 -5 -1 30\n");
 	}
-
+	int score = export_name(ddiag_affine, BW)(
+		work,
+		a, alen, b, blen,
+		score_matrix,
+		atoi(argv[6]),
+		atoi(argv[7]),
+		atoi(argv[8]));
+	printf("%d\n", score);
 	free(a); free(b); free(work);
 	return(0);
 }
@@ -646,21 +372,8 @@ int main(int argc, char *argv[])
 
 	void *work = aligned_malloc(128 * 1024 * 1024, 16);
 
-	#define l(s, p, q) { \
-		assert(ddiag_linear(work, p, strlen(p), q, strlen(q), score_matrix, -1, 10) == (s)); \
-	}
-	l( 0, "", "");
-	l( 0, "A", "");
-	l( 1, "A", "A");
-	l( 3, "AAA", "AAA");
-	l( 0, "AAA", "TTT");
-	l( 3, "AAAGGG", "AAATTTTTT");
-	l( 3, "TTTGGGGGAAAA", "TTTCCCCCCCCAAAA");
-	l( 5, "AAACAAAGGG", "AAAAAATTTTTTT");
-	l( 4, "AAACCAAAGGG", "AAAAAATTTTTTT");
-
 	#define a(s, p, q) { \
-		assert(ddiag_affine(work, p, strlen(p), q, strlen(q), score_matrix, -1, -1, 10) == (s)); \
+		assert(export_name(ddiag_affine, BW)(work, p, strlen(p), q, strlen(q), score_matrix, -1, -1, 10) == (s)); \
 	}
 	a( 0, "", "");
 	a( 0, "A", "");
@@ -672,10 +385,7 @@ int main(int argc, char *argv[])
 	a( 4, "AAACAAAGGG", "AAAAAATTTTTTT");
 	a( 3, "AAACCAAAGGG", "AAAAAATTTTTTT");
 
-	int sl = ddiag_linear(work, a, strlen(a), b, strlen(b), score_matrix, -1, 30);
-	printf("%d\n", sl);
-
-	int sa = ddiag_affine(work, a, strlen(a), b, strlen(b), score_matrix, -1, -1, 30);
+	int sa = export_name(ddiag_affine, BW)(work, a, strlen(a), b, strlen(b), score_matrix, -1, -1, 30);
 	printf("%d\n", sa);
 
 
