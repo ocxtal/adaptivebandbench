@@ -37,4 +37,5 @@ bench: $(BENCH_MODULES) $(ABAND_MODULES)
 	$(CXX) $(CXXFLAGS) -o bin/bench -DBENCH $(BENCH_SRCS) $(BENCH_MODULES) $(ABAND_MODULES)
 
 clean:
-	rm *.o bin/*
+	rm -r *.o bin/*
+
