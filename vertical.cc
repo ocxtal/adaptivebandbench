@@ -1,8 +1,8 @@
 
 /**
- * @file vert.cc
+ * @file vertical.cc
  *
- * @brief simd parallel blast_SemiGappedAlign algorithm
+ * @brief vertical parallelization of the standard banded matrix
  */
 #include <string.h>
 #include "sse.h"
@@ -14,10 +14,10 @@
 #define roundup(a, bound)		( (((a) + (bound) - 1) / (bound)) * (bound) )
 
 /**
- * @fn vert_affine
+ * @fn vertical_affine
  */
 int
-vert_affine(
+vertical_affine(
 	void *work,
 	char const *a,
 	uint64_t alen,
@@ -28,30 +28,29 @@ vert_affine(
 	if(alen == 0 || blen == 0) { return(0); }
 	debug("%s, %s", a, b);
 
-	/* s: score vector, e: horizontal gap, f: vertical gap */
+	/* s: score vector, e: horizontal gap, f: verticalical gap */
 	#define _s(_p, _i)		( (_p)[         (_i)] )
-	#define _e(_p, _i)		( (_p)[    bw + (_i)] )
-	#define _f(_p, _i)		( (_p)[2 * bw + (_i)] )
-	#define _m(_p)			( (_p)[3 * bw       ] )
-	#define _vlen()			( 3 * bw )
-	uint8_t c[bw + 1];
+	#define _e(_p, _i)		( (_p)[2 * bw + (_i)] )
+	#define _f(_p, _i)		( (_p)[4 * bw + (_i)] )
+	#define _vlen()			( 6 * bw )
+	uint8_t c[2 * bw + 1];
 
-	/* init the leftmost vector (vertically placed) */
+	/* init the leftmost vector (verticalically placed) */
 	uint16_t *base = (uint16_t *)((uint8_t *)work + sizeof(maxpos_t)), *curr = base, *prev = base;
 	int8_t margin = -2 * extract_min_score(score_matrix);
 	#define _gap(_i)		( ((_i) > 0 ? gi : 0) + (_i) * ge )
-	for(uint64_t i = 0; i < bw; i++) {
-		if(i < bw / 2) {
+	for(uint64_t i = 0; i < 2 * bw; i++) {
+		if(i < bw) {
 			_s(curr, i) = _e(curr, i) = _f(curr, i) = 0;
 			c[i + 1] = 0;
 		} else {
-			_s(curr, i) = _f(curr, i) = OFS + _gap(i - bw/2);
-			_e(curr, i) = margin;
-			c[i + 1] = (i - bw / 2) < blen ? encode_b(b[i - bw / 2]) : 0;
+			_s(curr, i) = _f(curr, i) = OFS + _gap(i - bw);
+			_e(curr, i) = 0;
+			c[i + 1] = (i - bw) < blen ? encode_b(b[i - bw]) : 0;
 		}
 	}
-	_e(curr, bw / 2) = OFS + gi;				/* fix gap cells at (0, 0) */
-	_f(curr, bw / 2) = OFS + gi;
+	_e(curr, bw) = OFS + gi;					/* fix gap cells at (0, 0) */
+	_f(curr, bw) = OFS + gi;
 	uint64_t smax = OFS, amax = 0;				/* max score and its position */
 
 	vec const z, giv(-gi), gev(-ge), gev2(-2*ge), gev4(-4*ge), smv((uint16_t const *)score_matrix);
@@ -62,33 +61,34 @@ vert_affine(
 		prev = curr; curr += _vlen();
 
 		/* fetch the next base */
-		c[bw] = (apos + bw / 2) < blen ? encode_b(b[apos + bw / 2]) : 0;
+		c[bw] = (apos + bw) < blen ? encode_b(b[apos + bw]) : 0;
 
 		/* init f */
-		vec pf, ce(&_e(prev, 0));
+		vec pf, cv(&_s(prev, 0)), ce(&_e(prev, 0));
 
 		/* bpos = apos + bofs - bw/2 */
-		for(uint64_t bofs = 0; bofs < bw; bofs += vec::LEN) {
+		for(uint64_t bofs = 0; bofs < 2 * bw; bofs += vec::LEN) {
 			debug("bofs(%llu)", bofs);
 			/* load prev vectors */
-			vec pv(&_s(prev, bofs)), te(&_e(prev, bofs + vec::LEN));
-			if(bofs + vec::LEN >= bw) { te = z; }
-			vec pe = te.dsr(ce); ce = te;
+			vec tv(&_s(prev, bofs + vec::LEN)), te(&_e(prev, bofs + vec::LEN));
+			if(bofs + vec::LEN >= 2 * bw) { tv = z; te = z; }
+			vec pv = cv, ph = tv.dsr(cv), pe = te.dsr(ce);
+			cv = tv; ce = te;
 
 			/* calc score */
 			char_vec bv((int8_t const *)&c[bofs + 1]);
 			bv.store(&c[bofs]);					/* shift by one */
-			pv = vec::max(pv, gev4);			/* ensure not rounded by adding the score profile */
+			pv = vec::max(pv, giv);				/* ensure not rounded by adding the score profile */
 			pv += smv.shuffle(av | bv);
 
 			/* calc e */
-			pe = vec::max(pv - giv, pe - gev);
+			pe = vec::max(ph - giv, pe) - gev;
 			pe.store(&_e(curr, bofs)); pe.print("pe");
 
 			/* calc tentative s */
 			pv = vec::max(pv, pe); pv.print("pv (tentative)");
 
-			/* calc f: vertical gap propagation */
+			/* calc f: verticalical gap propagation */
 			pf = vec::max(pv - giv, (pf>>7) - gev);
 			pf = vec::max(pf, (pf<<1) - gev);
 			pf = vec::max(pf, (pf<<2) - gev2);
@@ -111,6 +111,9 @@ vert_affine(
 
 	/* save the maxpos */
 	maxpos_t *r = (maxpos_t *)work;
+	r->alen = alen;
+	r->blen = blen;
+
 	base += _vlen() * amax;
 	uint16_t m = max.hmax();
 	debug("m(%u), amax(%llu)", m, amax);
@@ -119,7 +122,7 @@ vert_affine(
 		s.print("s");
 		if(s == t) {
 			r->apos = amax;
-			r->bpos = tzcnt(s == t) / 2 + bofs - bw / 2 + amax;
+			r->bpos = tzcnt(s == t) / 2 + bofs - bw + amax;
 			debug("amax(%llu), bmax(%llu), mask(%hx), bofs(%llu)", r->apos, r->bpos, s == t, bofs);
 			break;
 		}
@@ -153,7 +156,7 @@ int main_ext(int argc, char *argv[])
 		printf("./a.out AAA AAA 2 -3 -5 -1 30\n");
 	}
 
-	int score = vert_affine(
+	int score = vertical_affine(
 		work,
 		a, alen, b, blen,
 		score_matrix,
@@ -175,7 +178,7 @@ int main(int argc, char *argv[])
 	void *work = aligned_malloc(128 * 1024 * 1024, 16);
 
 	#define a(s, p, q) { \
-		assert(vert_affine(work, p, strlen(p), q, strlen(q), score_matrix, -1, -1, 10, 32) == (s)); \
+		assert(vertical_affine(work, p, strlen(p), q, strlen(q), score_matrix, -1, -1, 10, 32) == (s)); \
 	}
 	a( 0, "", "");
 	a( 0, "A", "");
@@ -197,5 +200,5 @@ int main(int argc, char *argv[])
 #endif
 
 /**
- * end of vert.cc
+ * end of vertical.cc
  */
