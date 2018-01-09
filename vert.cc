@@ -23,26 +23,26 @@ vert_affine(
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
-	int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt, int bw)
+	int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt, uint32_t bw)
 {
 	if(alen == 0 || blen == 0) { return(0); }
 	debug("%s, %s", a, b);
 
 	/* s: score vector, e: horizontal gap, f: vertical gap */
-	uint16_t *base = (uint16_t *)((uint8_t *)work + sizeof(maxpos_t)), *curr = base, *prev = base;
 	#define _s(_p, _i)		( (_p)[         (_i)] )
 	#define _e(_p, _i)		( (_p)[    bw + (_i)] )
 	#define _f(_p, _i)		( (_p)[2 * bw + (_i)] )
 	#define _m(_p)			( (_p)[3 * bw       ] )
-	#define _vlen()			( 3 * bw + vec::LEN )
+	#define _vlen()			( 3 * bw )
 	uint8_t c[bw + 1];
 
 	/* init the leftmost vector (vertically placed) */
+	uint16_t *base = (uint16_t *)((uint8_t *)work + sizeof(maxpos_t)), *curr = base, *prev = base;
 	int8_t margin = -2 * extract_min_score(score_matrix);
 	#define _gap(_i)		( ((_i) > 0 ? gi : 0) + (_i) * ge )
 	for(uint64_t i = 0; i < bw; i++) {
 		if(i < bw / 2) {
-			_s(curr, i) = _e(curr, i) = _f(curr, i) = margin;
+			_s(curr, i) = _e(curr, i) = _f(curr, i) = 0;
 			c[i + 1] = 0;
 		} else {
 			_s(curr, i) = _f(curr, i) = OFS + _gap(i - bw/2);
@@ -50,10 +50,11 @@ vert_affine(
 			c[i + 1] = (i - bw / 2) < blen ? encode_b(b[i - bw / 2]) : 0;
 		}
 	}
-	_m(curr) = OFS;								/* clear the max vector */
-	uint64_t amax = 0;							/* max score position */
+	_e(curr, bw / 2) = OFS + gi;				/* fix gap cells at (0, 0) */
+	_f(curr, bw / 2) = OFS + gi;
+	uint64_t smax = OFS, amax = 0;				/* max score and its position */
 
-	vec const giv(-gi), gev(-ge), gev2(-2*ge), gev4(-4*ge), smv((uint16_t const *)score_matrix);
+	vec const z, giv(-gi), gev(-ge), gev2(-2*ge), gev4(-4*ge), smv((uint16_t const *)score_matrix);
 	vec max(OFS);
 	for(uint64_t apos = 0; apos < alen; apos++) {
 		debug("apos(%llu)", apos);
@@ -64,39 +65,39 @@ vert_affine(
 		c[bw] = (apos + bw / 2) < blen ? encode_b(b[apos + bw / 2]) : 0;
 
 		/* init f */
-		vec pf;
+		vec pf, ce(&_e(prev, 0));
 
 		/* bpos = apos + bofs - bw/2 */
 		for(uint64_t bofs = 0; bofs < bw; bofs += vec::LEN) {
+			debug("bofs(%llu)", bofs);
 			/* load prev vectors */
-			vec pv(&_s(prev, bofs));
-			vec pe(&_e(prev, bofs + 1));		/* unaligned */
+			vec pv(&_s(prev, bofs)), te(&_e(prev, bofs + vec::LEN));
+			if(bofs + vec::LEN >= bw) { te = z; }
+			vec pe = te.dsr(ce); ce = te;
 
 			/* calc score */
 			char_vec bv((int8_t const *)&c[bofs + 1]);
 			bv.store(&c[bofs]);					/* shift by one */
+			pv = vec::max(pv, gev4);			/* ensure not rounded by adding the score profile */
 			pv += smv.shuffle(av | bv);
-			av.print("av"); bv.print("bv"); smv.shuffle(av | bv).print("score");
 
 			/* calc e */
-			pe = pe + gev;
-			pe.store(&_e(curr, bofs));
+			pe = vec::max(pv - giv, pe - gev);
+			pe.store(&_e(curr, bofs)); pe.print("pe");
 
 			/* calc tentative s */
 			pv = vec::max(pv, pe); pv.print("pv (tentative)");
 
-			/* calc f */
-			pf = vec::max(pv - giv, (pf>>7) - gev); pf.print("pf1");
-			pf = vec::max(pf, (pf<<1) - gev); pf.print("pf2");
-			pf = vec::max(pf, (pf<<2) - gev2); pf.print("pf3");
-			pf = vec::max(pf, (pf<<4) - gev4); pf.print("pf4");
+			/* calc f: vertical gap propagation */
+			pf = vec::max(pv - giv, (pf>>7) - gev);
+			pf = vec::max(pf, (pf<<1) - gev);
+			pf = vec::max(pf, (pf<<2) - gev2);
+			pf = vec::max(pf, (pf<<4) - gev4);
 
 			/* fixup s */
-			pv = vec::max(pv, pf);
-
-			pv.print("pv"); pe.print("pe"); pf.print("pf");
+			pv = vec::max(pv, pf); pv.print("pv");
 			pv.store(&_s(curr, bofs));
-			pf.store(&_f(curr, bofs));
+			pf.store(&_f(curr, bofs)); pf.print("pf");
 
 			/* update max */
 			max = vec::max(max, pv);
@@ -104,9 +105,8 @@ vert_affine(
 
 		/* update maxpos */
 		uint16_t m = max.hmax();
-		debug("m(%u), pm(%u)", m, _m(prev));
-		if(m > _m(prev)) { amax = apos + 1; }
-		_m(curr) = m;
+		debug("m(%u), pm(%u)", m, smax);
+		if(m > smax) { smax = m; amax = apos + 1; }
 	}
 
 	/* save the maxpos */
@@ -115,16 +115,16 @@ vert_affine(
 	uint16_t m = max.hmax();
 	debug("m(%u), amax(%llu)", m, amax);
 	for(uint64_t bofs = 0; bofs < bw; bofs += vec::LEN) {
-		vec p(&_s(base, bofs)), q(m);
-		p.print("p");
-		if(p == q) {
+		vec s(&_s(base, bofs)), t(m);
+		s.print("s");
+		if(s == t) {
 			r->apos = amax;
-			r->bpos = tzcnt(p == q) + bofs - bw / 2 + amax;
-			debug("amax(%llu), bmax(%llu)", r->apos, r->bpos);
+			r->bpos = tzcnt(s == t) / 2 + bofs - bw / 2 + amax;
+			debug("amax(%llu), bmax(%llu), mask(%hx), bofs(%llu)", r->apos, r->bpos, s == t, bofs);
 			break;
 		}
 	}
-	printf("score(%d)\n", m - OFS);
+	debug("score(%d)", m - OFS);
 	return(m - OFS);
 }
 
@@ -184,8 +184,12 @@ int main(int argc, char *argv[])
 	a( 0, "AAA", "TTT");
 	a( 3, "AAAGGG", "AAATTTTTT");
 	a( 3, "TTTGGGGGAAAA", "TTTCCCCCCCCAAAA");
-	a( 4, "AAACAAAGGG", "AAAAAATTTTTTT");
-	a( 3, "AAACCAAAGGG", "AAAAAATTTTTTT");
+	a( 4, "TTTAAAA", "TTTCCAAAA");
+	a( 4, "GGGCCCC", "GGGAACCCC");
+	a( 6, "AAACAAAAAGGG", "AAAAAAAATTTTTTT");
+	a( 6, "AAAAAAAATTTTTTT", "AAACAAAAAGGG");
+	a( 5, "AAACCAAAAAGGG", "AAAAAAAATTTTTTT");
+	a( 5, "AAAAAAAATTTTTTT", "AAACCAAAAAGGG");
 
 	free(work);
 	return(0);
