@@ -1,8 +1,8 @@
 
 /**
- * @file diag.cc
+ * @file diagonal.cc
  *
- * @brief SIMD banded
+ * @brief diagonal parallelization of the standard banded matrix
  */
 #include <string.h>
 #include "sse.h"
@@ -12,10 +12,10 @@
 #define OFS 	( 32768 )
 
 /**
- * @fn diag_affine
+ * @fn diagonal_affine
  */
 int
-diag_affine(
+diagonal_affine(
 	void *work,
 	char const *a,
 	uint64_t alen,
@@ -30,7 +30,6 @@ diag_affine(
 	#define _s(_p, _i)		( (_p)[         (_i)] )
 	#define _e(_p, _i)		( (_p)[    bw + (_i)] )
 	#define _f(_p, _i)		( (_p)[2 * bw + (_i)] )
-	#define _m(_p)			( (_p)[3 * bw       ] )
 	#define _vlen()			( 3 * bw )
 	uint8_t abuf[bw + 1], bbuf[bw + 1];
 
@@ -159,6 +158,9 @@ diag_affine(
 
 	/* save the maxpos */
 	maxpos_t *r = (maxpos_t *)work;
+	r->alen = alen;
+	r->blen = blen;
+
 	base += _vlen() * pmax;
 	uint16_t m = max.hmax();
 	debug("m(%u), amax(%llu)", m, smax);
@@ -201,7 +203,7 @@ int main_ext(int argc, char *argv[])
 	if(0) {
 		printf("./a.out AAA AAA 2 -3 -5 -1 30\n");
 	}
-	int score = diag_affine(
+	int score = diagonal_affine(
 		work,
 		a, alen, b, blen,
 		score_matrix,
@@ -229,7 +231,7 @@ int main(int argc, char *argv[])
 	void *work = aligned_malloc(128 * 1024 * 1024, 16);
 
 	#define a(s, p, q) { \
-		assert(diag_affine(work, p, strlen(p), q, strlen(q), score_matrix, -1, -1, 10, 32) == (s)); \
+		assert(diagonal_affine(work, p, strlen(p), q, strlen(q), score_matrix, -1, -1, 10, 32) == (s)); \
 	}
 	a( 0, "", "");
 	a( 0, "A", "");
@@ -251,5 +253,5 @@ int main(int argc, char *argv[])
 #endif
 
 /**
- * end of diag.cc
+ * end of diagonal.cc
  */
