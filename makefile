@@ -6,7 +6,7 @@ CXXFLAGS=-Wall -std=gnu++11 -O3 -msse4.1 -fopenmp
 
 BENCH_SRCS=main.cc blast.cc simdblast.cc
 # BENCH_SRCS=main.cc alinear.cc aaffine.cc blast.cc simdblast.cc
-BENCH_MODULES=wave/DB.o wave/QV.o wave/align.o ssw.o parasail/cpuid.o parasail/io.o parasail/matrix_lookup.o parasail/memory.o parasail/memory_sse.o parasail/time.o sg_striped_sse41_128_16.o full.o
+BENCH_MODULES=wave/DB.o wave/QV.o wave/align.o ssw.o parasail/cpuid.o parasail/io.o parasail/matrix_lookup.o parasail/memory.o parasail/memory_sse.o parasail/time.o sg_striped_sse41_128_16.o
 ABAND_MODULES=$(shell seq -f'aband.%g.o ' 32 8 256)
 
 all: recall bench
@@ -28,7 +28,6 @@ $(BENCH_MODULES):
 	$(CC) $(CFLAGS) -c -o parasail/memory_sse.o -I. parasail/memory_sse.c
 	$(CC) $(CFLAGS) -c -o parasail/time.o -I. parasail/time.c
 	$(CC) $(CFLAGS) -c -o sg_striped_sse41_128_16.o -I. sg_striped_sse41_128_16.c
-	$(CC) $(CFLAGS) -c -o full.o full.c
 
 $(ABAND_MODULES):
 	$(CXX) $(CXXFLAGS) -c -o $@ -DBW=`echo $@ | cut -d'.' -f2` aband.cc
