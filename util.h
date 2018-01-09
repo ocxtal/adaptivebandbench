@@ -20,6 +20,7 @@
 /* result container */
 typedef struct maxpos_s {
 	uint64_t apos, bpos;
+	uint64_t alen, blen;
 } maxpos_t;
 
 /**
