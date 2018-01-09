@@ -149,14 +149,18 @@ public:
 	/* print */
 	#ifdef DEBUG
 	void print(void) const {
-		print(stderr);
+		print(stderr, NULL);
 	}
-	void print(FILE *fp) const {
-		fprintf(fp, "[%016llx]\n", v);
+	void print(char const *msg) const {
+		print(stderr, msg);
+	}
+	void print(FILE *fp, char const *msg) const {
+		fprintf(fp, "%s%s[%016llx]\n", msg == NULL ? "" : msg, msg == NULL ? "" : " ", v);
 	}
 	#else
 	void print(void) const {}
-	void print(FILE *fp) const {}
+	void print(char const *msg) const {}
+	void print(FILE *fp, char const *msg) const {}
 	#endif
 };
 
@@ -339,7 +343,7 @@ public:
 	inline vec select(vec const &m, vec const &x) const {
 		return(vec(_mm_blendv_epi8(x.get(), m.get(), v)));
 	}
-	inline vec shuffle(char_vec const &a) {
+	inline vec shuffle(char_vec const &a) const {
 		__m128i index = _mm_cvtsi64_si128(a.get());
 		return(vec(_mm_cvtepi8_epi16(_mm_shuffle_epi8(v, index))));
 	}
@@ -378,18 +382,23 @@ public:
 	/* print */
 	#ifdef DEBUG
 	void print(void) const {
-		print(stderr);
+		print(stderr, NULL);
 	}
-	void print(FILE *fp) const {
+	void print(char const *msg) const {
+		print(stderr, msg);
+	}
+	void print(FILE *fp, char const *msg) const {
 		uint16_t b[8] __attribute__(( aligned (16) ));
 		store(b);
 		fprintf(fp,
-			"[%04x %04x %04x %04x %04x %04x %04x %04x]\n",
-			b[7], b[6], b[5], b[4], b[3], b[2], b[1], b[0]);
+			"%s%s[%d, %d, %d, %d, %d, %d, %d, %d]\n",
+			msg == NULL ? "" : msg, msg == NULL ? "" : " ",
+			b[7] - 32768, b[6] - 32768, b[5] - 32768, b[4] - 32768, b[3] - 32768, b[2] - 32768, b[1] - 32768, b[0] - 32768);
 	}
 	#else
 	void print(void) const {}
-	void print(FILE *fp) const {}
+	void print(char const *msg) const {}
+	void print(FILE *fp, char const *msg) const {}
 	#endif
 };
 /**
