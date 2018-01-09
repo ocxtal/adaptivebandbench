@@ -1,11 +1,10 @@
 
 /**
- * @file ddiag.cc
+ * @file aband.cc
  *
  * @brief SIMD dynamic banded
  */
 #include <string.h>
-#include <smmintrin.h>
 #include "sse.h"
 #include "util.h"
 
@@ -20,10 +19,10 @@
 #define OFS 	( 32768 )
 
 /**
- * @fn ddiag_affine
+ * @fn aband_affine
  */
 int
-export_name(ddiag_affine, BW)(
+export_name(aband_affine, BW)(
 	void *work,
 	char const *a,
 	uint64_t alen,
@@ -346,7 +345,7 @@ int main_ext(int argc, char *argv[])
 	if(0) {
 		printf("./a.out AAA AAA 2 -3 -5 -1 30\n");
 	}
-	int score = export_name(ddiag_affine, BW)(
+	int score = export_name(aband_affine, BW)(
 		work,
 		a, alen, b, blen,
 		score_matrix,
@@ -373,7 +372,7 @@ int main(int argc, char *argv[])
 	void *work = aligned_malloc(128 * 1024 * 1024, 16);
 
 	#define a(s, p, q) { \
-		assert(export_name(ddiag_affine, BW)(work, p, strlen(p), q, strlen(q), score_matrix, -1, -1, 10) == (s)); \
+		assert(export_name(aband_affine, BW)(work, p, strlen(p), q, strlen(q), score_matrix, -1, -1, 10) == (s)); \
 	}
 	a( 0, "", "");
 	a( 0, "A", "");
@@ -385,7 +384,7 @@ int main(int argc, char *argv[])
 	a( 4, "AAACAAAGGG", "AAAAAATTTTTTT");
 	a( 3, "AAACCAAAGGG", "AAAAAATTTTTTT");
 
-	int sa = export_name(ddiag_affine, BW)(work, a, strlen(a), b, strlen(b), score_matrix, -1, -1, 30);
+	int sa = export_name(aband_affine, BW)(work, a, strlen(a), b, strlen(b), score_matrix, -1, -1, 30);
 	printf("%d\n", sa);
 
 
@@ -395,5 +394,5 @@ int main(int argc, char *argv[])
 #endif
 
 /**
- * end of ddiag.cc
+ * end of aband.cc
  */
