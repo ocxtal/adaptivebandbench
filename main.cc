@@ -10,7 +10,6 @@
 #include <stdarg.h>
 #include <sys/time.h>
 #include "util.h"
-#include "full.h"
 #include "kvec.h"
 #include "bench.h"
 #include "parasail.h"
@@ -47,43 +46,43 @@ int simdblast_affine(
 
 #define cat_name(x, y)			x##_##y
 #define export_name(x, y)		cat_name(x, y)
-#define ddiag_decl(_bw) \
-	int export_name(ddiag_affine, _bw)( \
+#define aband_decl(_bw) \
+	int export_name(aband_affine, _bw)( \
 		void *work, \
 		char const *a, \
 		uint64_t alen, \
 		char const *b, \
 		uint64_t blen, \
 		int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt);
-ddiag_decl(32)
-ddiag_decl(40)
-ddiag_decl(48)
-ddiag_decl(56)
-ddiag_decl(64)
-ddiag_decl(72)
-ddiag_decl(80)
-ddiag_decl(88)
-ddiag_decl(96)
-ddiag_decl(104)
-ddiag_decl(112)
-ddiag_decl(120)
-ddiag_decl(128)
-ddiag_decl(136)
-ddiag_decl(144)
-ddiag_decl(152)
-ddiag_decl(160)
-ddiag_decl(168)
-ddiag_decl(176)
-ddiag_decl(184)
-ddiag_decl(192)
-ddiag_decl(200)
-ddiag_decl(208)
-ddiag_decl(216)
-ddiag_decl(224)
-ddiag_decl(232)
-ddiag_decl(240)
-ddiag_decl(248)
-ddiag_decl(256)
+aband_decl(32)
+aband_decl(40)
+aband_decl(48)
+aband_decl(56)
+aband_decl(64)
+aband_decl(72)
+aband_decl(80)
+aband_decl(88)
+aband_decl(96)
+aband_decl(104)
+aband_decl(112)
+aband_decl(120)
+aband_decl(128)
+aband_decl(136)
+aband_decl(144)
+aband_decl(152)
+aband_decl(160)
+aband_decl(168)
+aband_decl(176)
+aband_decl(184)
+aband_decl(192)
+aband_decl(200)
+aband_decl(208)
+aband_decl(216)
+aband_decl(224)
+aband_decl(232)
+aband_decl(240)
+aband_decl(248)
+aband_decl(256)
 
 /* wrapper of Myers' wavefront algorithm */
 extern "C" {
@@ -360,7 +359,7 @@ int main(int argc, char *argv[])
 		bench_init(dda);
 		bench_start(dda);
 		for(i = 0; i < cnt; i++) {
-			sdda += ddiag_affine_32(work, a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
+			sdda += aband_affine_32(work, a, strlen(a), b, strlen(b), score_matrix, gi, ge, xt);
 		}
 		bench_end(dda);
 		print_bench(flag, "aband", 32, bench_get(ddl), bench_get(dda), sddl, sdda);
@@ -515,7 +514,7 @@ int main(int argc, char *argv[])
 		#endif
 
 		/* adaptive banded */
-		int (*ddiag_affine_table[])(
+		int (*aband_affine_table[])(
 			void *work,
 			char const *a,
 			uint64_t alen,
@@ -523,38 +522,38 @@ int main(int argc, char *argv[])
 			uint64_t blen,
 			int8_t score_matrix[16], int8_t gi, int8_t ge, int16_t xt) = {
 
-			ddiag_affine_32,
-			ddiag_affine_40,
-			ddiag_affine_48,
-			ddiag_affine_56,
-			ddiag_affine_64,
-			ddiag_affine_72,
-			ddiag_affine_80,
-			ddiag_affine_88,
-			ddiag_affine_96,
-			ddiag_affine_104,
-			ddiag_affine_112,
-			ddiag_affine_120,
-			ddiag_affine_128,
-			ddiag_affine_136,
-			ddiag_affine_144,
-			ddiag_affine_152,
-			ddiag_affine_160,
-			ddiag_affine_168,
-			ddiag_affine_176,
-			ddiag_affine_184,
-			ddiag_affine_192,
-			ddiag_affine_200,
-			ddiag_affine_208,
-			ddiag_affine_216,
-			ddiag_affine_224,
-			ddiag_affine_232,
-			ddiag_affine_240,
-			ddiag_affine_248,
-			ddiag_affine_256
+			aband_affine_32,
+			aband_affine_40,
+			aband_affine_48,
+			aband_affine_56,
+			aband_affine_64,
+			aband_affine_72,
+			aband_affine_80,
+			aband_affine_88,
+			aband_affine_96,
+			aband_affine_104,
+			aband_affine_112,
+			aband_affine_120,
+			aband_affine_128,
+			aband_affine_136,
+			aband_affine_144,
+			aband_affine_152,
+			aband_affine_160,
+			aband_affine_168,
+			aband_affine_176,
+			aband_affine_184,
+			aband_affine_192,
+			aband_affine_200,
+			aband_affine_208,
+			aband_affine_216,
+			aband_affine_224,
+			aband_affine_232,
+			aband_affine_240,
+			aband_affine_248,
+			aband_affine_256
 		};
 
-		for(int j = 0; j < sizeof(ddiag_affine_table) / sizeof(void *); j++) {
+		for(int j = 0; j < sizeof(aband_affine_table) / sizeof(void *); j++) {
 			if(flag > 0 && j != 8) { continue; }
 
 			bench_init(ddl);
@@ -562,7 +561,7 @@ int main(int argc, char *argv[])
 			bench_start(dda);
 			sdda = 0;
 			for(i = 0; i < kv_size(seq) / 2; i++) {
-				uint32_t s = ddiag_affine_table[j](work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
+				uint32_t s = aband_affine_table[j](work, kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge, xt);
 				sdda += s >= RECALL_THRESH * kv_at(ascore, i);
 
 				#if defined(DEBUG_PATH) && !defined(DEBUG_BLAST)
