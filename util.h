@@ -17,6 +17,11 @@
 #include <string.h>				/** memset, memcpy */
 #include <smmintrin.h>
 
+/* result container */
+typedef struct maxpos_s {
+	uint64_t apos, bpos;
+} maxpos_t;
+
 /**
  * aligned malloc
  */
