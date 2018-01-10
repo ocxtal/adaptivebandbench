@@ -1,8 +1,8 @@
 
 /**
- * @file vertical.cc
+ * @file scalar.cc
  *
- * @brief vertical parallelization of the standard banded matrix
+ * @brief scalar parallelization of the standard banded matrix
  */
 #include <string.h>
 #include "sse.h"
@@ -14,10 +14,10 @@
 #define roundup(a, bound)		( (((a) + (bound) - 1) / (bound)) * (bound) )
 
 /**
- * @fn vertical_affine
+ * @fn scalar_affine
  */
 int
-vertical_affine(
+scalar_affine(
 	void *work,
 	char const *a,
 	uint64_t alen,
@@ -28,14 +28,14 @@ vertical_affine(
 	if(alen == 0 || blen == 0) { return(0); }
 	debug("%s, %s", a, b);
 
-	/* s: score vector, e: horizontal gap, f: verticalical gap */
+	/* s: score vector, e: horizontal gap, f: scalarical gap */
 	#define _s(_p, _i)		( (_p)[         (_i)] )
 	#define _e(_p, _i)		( (_p)[2 * bw + (_i)] )
 	#define _f(_p, _i)		( (_p)[4 * bw + (_i)] )
 	#define _vlen()			( 6 * bw )
 	uint8_t c[2 * bw + vec::LEN];
 
-	/* init the leftmost vector (verticalically placed) */
+	/* init the leftmost vector (scalarically placed) */
 	uint16_t *base = (uint16_t *)((uint8_t *)work + sizeof(maxpos_t)), *curr = base, *prev = base;
 	#define _gap(_i)		( ((_i) > 0 ? gi : 0) + (_i) * ge )
 	for(uint64_t i = 0; i < 2 * bw; i++) {
@@ -73,9 +73,9 @@ vertical_affine(
 
 			c[bofs] = c[bofs + 1];				/* shift by one */
 
-			pe = MAX2(ph + gi, pe) + ge;
-			pf = MAX2(pv + gi, pf) + ge;
-			pv = MAX3(pd + score, pe, pf);
+			pe = MAX3(0, ph + gi, pe) + ge;
+			pf = MAX3(0, pv + gi, pf) + ge;
+			pv = MAX4(0, pd + score, pe, pf);
 			_s(curr, bofs) = pv < 0 ? 0 : pv;
 			_e(curr, bofs) = pe < 0 ? 0 : pe;
 			_f(curr, bofs) = pf < 0 ? 0 : pf;
@@ -139,7 +139,7 @@ int main_ext(int argc, char *argv[])
 		printf("./a.out AAA AAA 2 -3 -5 -1 30\n");
 	}
 
-	int score = vertical_affine(
+	int score = scalar_affine(
 		work,
 		a, alen, b, blen,
 		score_matrix,
@@ -161,7 +161,7 @@ int main(int argc, char *argv[])
 	void *work = aligned_malloc(128 * 1024 * 1024, 16);
 
 	#define a(s, p, q) { \
-		assert(vertical_affine(work, p, strlen(p), q, strlen(q), score_matrix, -1, -1, 10, 32) == (s)); \
+		assert(scalar_affine(work, p, strlen(p), q, strlen(q), score_matrix, -1, -1, 10, 32) == (s)); \
 	}
 	a( 0, "", "");
 	a( 0, "A", "");
@@ -183,5 +183,5 @@ int main(int argc, char *argv[])
 #endif
 
 /**
- * end of vertical.cc
+ * end of scalar.cc
  */
