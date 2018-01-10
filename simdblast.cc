@@ -28,14 +28,13 @@ simdblast_affine(
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
-	int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt)
-	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
+	int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt,
+	uint32_t bw)		/* unused */
 {
 	if(alen == 0 || blen == 0) { return(0); }
 	debug("%s, %s", a, b);
 
 	uint64_t i, a_size, first_a_index, last_a_index, a_index, b_index;
-	/* gvはaffine gap costにあわせて書き換える */
 	vec const xtv(xt), zv, ofsv(OFS);
 	vec const giv(-gi), gev(-ge), gev2(-2*ge), gev4(-4*ge), gev8(-8*ge);
 	int16_t const acc_ge[vec::LEN] __attribute__(( aligned(16) )) = {

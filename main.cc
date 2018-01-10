@@ -1,3 +1,4 @@
+#define DEBUG
 
 /**
  * @file main.cc
@@ -8,12 +9,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <getopt.h>
 #include <sys/time.h>
 #include "util.h"
 #include "kvec.h"
 #include "bench.h"
 #include "parasail.h"
 #include "ssw.h"
+#include "full.h"
 
 #define M 					( 1 )
 #define X 					( 1 )
@@ -27,62 +30,19 @@
 // #define DEBUG_PATH
 // #define DEBUG_BLAST			1
 
-int blast_affine(
-	void *work,
-	char const *a,
-	uint64_t alen,
-	char const *b,
-	uint64_t blen,
-	int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt);
+typedef struct { size_t n, m; uint8_t *a; } uint8_v;
+typedef struct { size_t n, m; uint64_t *a; } uint64_v;
+typedef struct { size_t n, m; void **a; } ptr_v;
+typedef struct { size_t n, m; int32_t *a; } int32_v;
 
-int simdblast_affine(
-	void *work,
-	char const *a,
-	uint64_t alen,
-	char const *b,
-	uint64_t blen,
-	int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt);
-	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt);
-
-#define cat_name(x, y)			x##_##y
-#define export_name(x, y)		cat_name(x, y)
-#define aband_decl(_bw) \
-	int export_name(aband_affine, _bw)( \
-		void *work, \
-		char const *a, \
-		uint64_t alen, \
-		char const *b, \
-		uint64_t blen, \
-		int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt);
-aband_decl(32)
-aband_decl(40)
-aband_decl(48)
-aband_decl(56)
-aband_decl(64)
-aband_decl(72)
-aband_decl(80)
-aband_decl(88)
-aband_decl(96)
-aband_decl(104)
-aband_decl(112)
-aband_decl(120)
-aband_decl(128)
-aband_decl(136)
-aband_decl(144)
-aband_decl(152)
-aband_decl(160)
-aband_decl(168)
-aband_decl(176)
-aband_decl(184)
-aband_decl(192)
-aband_decl(200)
-aband_decl(208)
-aband_decl(216)
-aband_decl(224)
-aband_decl(232)
-aband_decl(240)
-aband_decl(248)
-aband_decl(256)
+#define _base_signature			void *work, char const *a, uint64_t alen, char const *b, uint64_t blen, int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt, uint32_t bw
+int scalar_affine(_base_signature);
+int vertical_affine(_base_signature);
+int diagonal_affine(_base_signature);
+int striped_affine(_base_signature);
+int blast_affine(_base_signature);
+int simdblast_affine(_base_signature);
+int adaptive_affine(_base_signature);
 
 /* wrapper of Myers' wavefront algorithm */
 extern "C" {
@@ -270,65 +230,296 @@ int print_msg(int flag, char const *fmt, ...)
 	return(r);
 }
 
-int print_bench(int flag, char const *name, int suffix, int64_t l, int64_t a, int64_t sl, int64_t sa)
+int print_bench(int flag, char const *name, int64_t b, int64_t score)
 {
 	if(flag == 0) {
-		if(suffix == 0) {
-			return(printf("%s\t%ld\t%ld\t%ld\t%ld\n", name, l / 1000, a / 1000, sl, sa));
-		} else {
-			return(printf("%s.%d\t%ld\t%ld\t%ld\t%ld\n", name, suffix, l / 1000, a / 1000, sl, sa));
-		}
+		return(printf("%s\t%ld\t%ld\n", name, b / 1000, score));
 	} else if(flag == 1) {
-		return(printf("%ld\t%ld\t", l / 1000, a / 1000));
+		return(printf("%ld\n", b / 1000));
 	} else if(flag == 2) {
-		return(printf("%ld\t", a / 1000));
+		return(printf("%ld\t", b / 1000));
 	}
 	return(0);
 }
 
-int main(int argc, char *argv[])
+
+struct params_s {
+	int8_t score_matrix[16];
+	int m, x, gi, ge, xt;
+	uint32_t bw;
+	uint64_t max_cnt, max_len;
+	uint64_t flag, rdseed, pipe;
+	char *list;
+
+	uint8_v buf;
+	ptr_v seq;
+	uint64_v len;
+	int32_v ascore;
+	uint64_v apos;
+	uint64_v bpos;
+
+	void *work;
+};
+
+void init_args(struct params_s *p)
 {
-	int flag = 0;
-	if(argc > 1 && strcmp(argv[1], "-s") == 0) {
-		flag = 1;
-		argc--; argv++;
-	} else if(argc > 1 && strcmp(argv[1], "-a") == 0) {
-		flag = 2;
-		argc--; argv++;
-	}
+	build_score_matrix(p->score_matrix, M, -X);
+	p->m = M; p->x = -X; p->gi = -GI; p->ge = -GE;
+	p->xt = XDROP;
+	p->bw = 32;
+	p->max_len = 10000;
+	p->max_cnt = 1000;
+	p->flag = 0;
+	p->rdseed = 0;
+	p->pipe = 0;
+	p->list = mm_strdup("scalar,vertical,diagonal,striped,adaptive,blast,simdblast");
 
-	uint64_t i;
-	int const m = M, x = -X, gi = -GI, ge = -GE;
-	int const xt = XDROP;
-	char *a, *b, *at, *bt;
-	bench_t bl, ba, sl, sa, ddl, dda, wl, pa, fa;
-	volatile int64_t sbl = 0, sba = 0, ssl = 0, ssa = 0, sddl = 0, sdda = 0, sfa = 0, spa = 0, swl = 0;
-	struct timeval tv;
-
-	int8_t score_matrix[16] __attribute__(( aligned(16) ));
-	build_score_matrix(score_matrix, m, x);
-
-	gettimeofday(&tv, NULL);
-	unsigned long s = (argc > 3) ? atoi(argv[3]) : tv.tv_usec;
-	srand(s);
-
-	if(flag == 0) {
-		print_msg(flag, "seed:%lu\tm: %d\tx: %d\tgi: %d\tge: %d\txdrop: %d\n", s, m, x, gi, ge, xt);
-	}
+	kv_init(p->buf);
+	kv_init(p->seq);
+	kv_init(p->len);
+	kv_init(p->ascore);
+	kv_init(p->apos);
+	kv_init(p->bpos);
 
 	/* malloc work */
-	void *work = aligned_malloc(1024 * 1024 * 1024, sizeof(__m128i));
+	p->work = aligned_malloc(1024 * 1024 * 1024, sizeof(__m128i));
 
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	p->rdseed = tv.tv_usec;
+	return;
+}
+
+void clean_args(struct params_s *p)
+{
+	free(p->list);
+	free(p->buf.a);
+	free(p->seq.a);
+	free(p->len.a);
+	free(p->ascore.a);
+	free(p->apos.a);
+	free(p->bpos.a);
+	free(p->work);
+	return;
+}
+
+int parse_args(struct params_s *p, int c, char *arg)
+{
+	switch(c) {
+		case 'l': p->max_len = atoi(arg); break;
+		case 'c': p->max_cnt = atoi(arg); break;
+		case 's': p->flag = 1; break;
+		case 'a': p->flag = 2; break;
+		case 'n': free(p->list); p->list = mm_strdup(arg); break;
+		case 'b': p->bw = atoi(arg); break;
+		case 'x': p->xt = atoi(arg); break;
+		case 'r': p->rdseed = atoi(arg); break;
+		case 'i': p->pipe = 1; break;
+	}
+	return(0);
+}
+
+uint64_t read_seq(struct params_s *params)
+{
+	int c;
+	uint64_t const rl = 100;
+
+	uint64_t base = 0, i = 0;
+	while((c = getchar()) != EOF) {
+		if(c == '\n') {
+			uint64_t l = MIN2(params->max_len, kv_size(params->buf) - base);
+			if(kv_size(params->seq) & 0x02) {
+				revcomp((char *)&kv_at(params->buf, base), kv_size(params->buf) - base);
+			}
+
+			for(i = 0; i < rl; i++) {
+				kv_push(params->buf, rbase());
+			}
+			kv_push(params->len, l + rl);
+			kv_push(params->seq, (void *)base);
+			params->buf.n = base + l + rl;
+			kv_push(params->buf, '\0');
+			base = kv_size(params->buf);
+		} else {
+			kv_push(params->buf, c);
+		}
+		if(++i == 2 * params->max_cnt) { break; }
+	}
+	kv_push(params->len, kv_size(params->buf) - base);
+	kv_push(params->seq, (char *)base);
+	kv_push(params->buf, '\0');
+
+	for(i = 0; i < kv_size(params->seq); i++) {
+		kv_at(params->seq, i) = (uint8_t *)kv_at(params->seq, i) + (ptrdiff_t)params->buf.a;
+	}
+	return(i / 2);
+}
+
+uint64_t simulate_seq(struct params_s *params)
+{
+	for(uint64_t i = 0; i < params->max_cnt; i++) {
+		char *a = rseq(params->max_len);
+		char *b = mseq(a, 10, 40, 40);
+		char *at = rseq(params->max_len / 10);
+		char *bt = rseq(params->max_len / 10);
+
+		a = (char *)realloc(a, 3 * params->max_len); strcat(a, at); free(at);
+		b = (char *)realloc(b, 3 * params->max_len); strcat(b, bt); free(bt);
+
+		kv_push(params->len, strlen(a));
+		kv_push(params->len, strlen(b));
+
+		kv_push(params->seq, (void *)kv_size(params->buf));
+		kv_pushm(params->buf, a, strlen(a));
+		kv_push(params->buf, '\0');
+
+		kv_push(params->seq, (void *)kv_size(params->buf));
+		kv_pushm(params->buf, b, strlen(b));
+		kv_push(params->buf, '\0');
+
+		free(a); free(b);
+	}
+
+	for(uint64_t i = 0; i < kv_size(params->seq); i++) {
+		kv_at(params->seq, i) = (uint8_t *)kv_at(params->seq, i) + (ptrdiff_t)params->buf.a;
+	}
+	return(params->max_cnt);
+}
+
+void calc_score(struct params_s *params)
+{
+	kv_reserve(params->ascore, kv_size(params->seq) / 2);
+	kv_reserve(params->apos, kv_size(params->seq) / 2);
+	kv_reserve(params->bpos, kv_size(params->seq) / 2);
+	#ifndef OMIT_SCORE
+		parasail_matrix_t *_matrix = parasail_matrix_create("ACGT", params->m, params->x);
+		#pragma omp parallel for
+		for(uint64_t i = 0; i < kv_size(params->seq) / 2; i++) {
+			parasail_result *r = parasail_sg_striped_sse41_128_16(
+				(char const *)kv_at(params->seq, i * 2),     kv_at(params->len, i * 2),
+				(char const *)kv_at(params->seq, i * 2 + 1), kv_at(params->len, i * 2 + 1),
+				-params->gi - params->ge,
+				-params->ge,
+				_matrix
+			);
+			kv_at(params->ascore, i) = r->score;
+			kv_at(params->apos, i) = r->end_query + 1;
+			kv_at(params->bpos, i) = r->end_ref + 1;
+			parasail_result_free(r);
+		}
+	#else
+		for(i = 0; i < kv_size(params->seq) / 2; i++) {
+			kv_at(params->ascore, i) = 0;
+			kv_at(params->apos, i) = 0;
+			kv_at(params->bpos, i) = 0;
+		}
+	#endif
+	return;
+}
+
+struct mapping_s {
+	char const *name;
+	int (*fp)(_base_signature);
+};
+void bench_function(struct params_s *params, struct mapping_s *map, char const *name)
+{
+	uint32_t bw = params->bw, xt = params->xt;
+	mm_split_foreach(name, ".", {
+		switch(i) {
+			case 1: bw = atoi(p); break;
+			case 2: xt = atoi(p); break;
+		}
+	});
+
+	int64_t score = 0;
+	bench_t b;
+	bench_init(b);
+	for(uint64_t i = 0; i < kv_size(params->seq) / 2; i++) {
+		bench_start(b);
+		int32_t s = map->fp(params->work,
+			(char const *)kv_at(params->seq, i * 2),     kv_at(params->len, i * 2),
+			(char const *)kv_at(params->seq, i * 2 + 1), kv_at(params->len, i * 2 + 1),
+			params->score_matrix,
+			params->gi, params->ge,
+			xt, bw
+		);
+		bench_end(b);
+		score += s;
+
+		debug("a(%s), b(%s)", kv_at(params->seq, i * 2), kv_at(params->seq, i * 2 + 1));
+
+		sw_result_t a = sw_affine(
+			(char const *)kv_at(params->seq, i * 2),     kv_at(params->len, i * 2),
+			(char const *)kv_at(params->seq, i * 2 + 1), kv_at(params->len, i * 2 + 1),
+			params->score_matrix, params->gi, params->ge
+		);
+
+		struct maxpos_s *mp = (struct maxpos_s *)params->work;
+		fprintf(stderr, "i(%llu), score(%d, %d, %d), apos(%llu, %llu, %llu, %llu), bpos(%llu, %llu, %llu, %llu)\n",
+			i, s, kv_at(params->ascore, i), a.score,
+			mp->apos, kv_at(params->apos, i), a.apos, kv_at(params->len, i * 2),
+			mp->bpos, kv_at(params->bpos, i), a.bpos, kv_at(params->len, i * 2 + 1));
+
+		free(a.path);
+	}
+	bench_end(b);
+	print_bench(params->flag, name, bench_get(b), score);
+	return;
+}
+
+int main(int argc, char *argv[])
+{
+	/* name -> pointer mapping */
+	#define fn(_name)	{ #_name, _name##_affine }
+	struct mapping_s map[] = {
+		/* static banded w/ standard matrix */
+		fn(scalar), fn(vertical), fn(diagonal), fn(striped),
+		/* non-standard banded */
+		fn(blast), fn(simdblast), fn(adaptive)
+	};
+	#undef fn
+
+	int i;
+	struct params_s params __attribute__(( aligned(16) ));
+	init_args(&params);
+	while((i = getopt(argc, argv, "l:c:s:a:n:b:x:r:i:")) != -1) {
+		if(parse_args(&params, i, optarg) != 0) { exit(1); }
+	}
+
+	srand(params.rdseed);
+	print_msg(params.flag, "seed:%lu\tm: %d\tx: %d\tgi: %d\tge: %d\txdrop: %d\tbw: %d\tmax_len: %d\tmax_cnt: %d\n",
+		params.rdseed,
+		params.m, params.x, params.gi, params.ge,
+		params.xt, params.bw,
+		params.max_len, params.max_cnt
+	);
+
+	uint64_t cnt;
+	if(argc > 1 && params.pipe != 0) {
+		cnt = read_seq(&params);
+	} else {
+		cnt = simulate_seq(&params);
+	}
+
+	/* collect scores with full-sized dp */
+	calc_score(&params);
+	mm_split_foreach(params.list, ",", {
+		for(uint64_t j = 0; j < sizeof(map) / sizeof(struct mapping_s); j++) {
+			debug("%s, %s", p, map[j].name);
+			if(strncmp(p, map[j].name, strlen(map[j].name)) == 0) {
+				char name[l + 1];
+				memcpy(name, p, l); name[l] = '\0';
+				bench_function(&params, &map[j], name);
+			}
+		}
+	});
+
+	clean_args(&params);
+	return(0);
+}
+
+#if 0
 	if(argc > 1 && strcmp(argv[1], "-") != 0) {
-		uint64_t len = (argc > 1) ? atoi(argv[1]) : 1000;
-		uint64_t cnt = (argc > 2) ? atoi(argv[2]) : 1000;
-		a = rseq(len * 9 / 10);
-		b = mseq(a, 10, 40, 40);
-		at = rseq(len / 10);
-		bt = rseq(len / 10);
-		a = (char *)realloc(a, 2*len); strcat(a, at); free(at);
-		b = (char *)realloc(b, 2*len); strcat(b, bt); free(bt);
-		print_msg(flag, "%p, %p\n", a, b);
 
 		// print_msg(flag, "%s\n%s\n", a, b);
 
@@ -400,76 +591,7 @@ int main(int argc, char *argv[])
 		free(b);
 
 	} else {
-		int c;
-		uint64_t max_len = (argc > 2) ? atoi(argv[2]) : 10000;
-		uint64_t const rl = 100;
 
-		if(flag != 0) {
-			printf("%lu\t", max_len);
-		}
-
-		kvec_t(char) buf;
-		kvec_t(char *) seq;
-		kvec_t(uint64_t) len;
-		kvec_t(uint32_t) ascore;
-
-		kv_init(buf);
-		kv_init(seq);
-		kv_init(len);
-		kv_init(ascore);
-
-		uint64_t base = 0;
-		while((c = getchar()) != EOF) {
-			if(c == '\n') {
-				uint64_t l = MIN2(max_len, kv_size(buf) - base);
-				if(kv_size(seq) & 0x02) {
-					revcomp((char *)&kv_at(buf, base), kv_size(buf) - base);
-				}
-
-				for(i = 0; i < rl; i++) {
-					kv_push(buf, rbase());
-				}
-				kv_push(len, l + rl);
-				kv_push(seq, (char *)base);
-				buf.n = base + l + rl;
-				kv_push(buf, '\0');
-				base = kv_size(buf);
-			} else {
-				kv_push(buf, c);
-			}
-		}
-		kv_push(len, kv_size(buf) - base);
-		kv_push(seq, (char *)base);
-		kv_push(buf, '\0');
-
-		for(i = 0; i < kv_size(seq); i++) {
-			kv_at(seq, i) += (ptrdiff_t)buf.a;
-		}
-
-		/* collect scores with full-sized dp */
-		kv_reserve(ascore, kv_size(seq) / 2);
-
-		#ifndef OMIT_SCORE
-			#ifdef PARASAIL_SCORE
-				parasail_matrix_t *_matrix = parasail_matrix_create("ACGT", M, -X);
-				#pragma omp parallel for
-				for(i = 0; i < kv_size(seq) / 2; i++) {
-					parasail_result *r = parasail_sg_striped_sse41_128_16(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), -gi-ge, -ge, _matrix);
-					kv_at(ascore, i) = r->score;
-					parasail_result_free(r);
-				}
-			#else
-				#pragma omp parallel for
-				for(i = 0; i < kv_size(seq) / 2; i++) {
-					sw_result_t a = sw_affine(kv_at(seq, i * 2), kv_at(len, i * 2), kv_at(seq, i * 2 + 1), kv_at(len, i * 2 + 1), score_matrix, gi, ge);
-					kv_at(ascore, i) = a.score;
-				}
-			#endif
-		#else
-			for(i = 0; i < kv_size(seq) / 2; i++) {
-				kv_at(ascore, i) = 0;
-			}
-		#endif
 
 		/* blast */
 		for(int xdrop = 40; xdrop <= 100; xdrop += 5) {
@@ -651,11 +773,9 @@ int main(int argc, char *argv[])
 		kv_destroy(len);
 		kv_destroy(ascore);
 	}
-
-	free(work);
 	return 0;
 }
-
+#endif
 /**
  * end of main.cc
  */

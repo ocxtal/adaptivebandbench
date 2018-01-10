@@ -21,6 +21,10 @@
 typedef struct maxpos_s {
 	uint64_t apos, bpos;
 	uint64_t alen, blen;
+	uint64_t ccnt;				/** #cells calculated */
+	uint64_t fcnt;				/** lazy-f count for debugging */
+	char *path;
+	uint64_t path_length;
 } maxpos_t;
 
 /**
@@ -184,6 +188,41 @@ int8_t extract_min_score(int8_t *matrix)
 #define MIN2(x,y) 		( (x) < (y) ? (x) : (y) )
 #define MIN3(x,y,z) 	( MIN2(x, MIN2(y, z)) )
 #define MIN4(w,x,y,z) 	( MIN2(MIN2(w, x), MIN2(y, z)) )
+
+
+/* split_foreach */
+#define mm_split_foreach(_ptr, _delims, _body) { \
+	char const *_q = (_ptr); \
+	int64_t i = 0; \
+	__m128i _dv = _mm_loadu_si128((__m128i const *)_delims); \
+	uint16_t _m, _mask = 0x02<<tzcnt(		/* reserve space for '\0' */ \
+		_mm_movemask_epi8(_mm_cmpeq_epi8(_mm_set1_epi8('\0'), _dv)) \
+	); \
+	_dv = _mm_slli_si128(_dv, 1); _mask--;						/* push '\0' at the head of the vector */ \
+	do { \
+		char const *_p = _q; \
+		/* test char one by one until dilimiter found */ \
+		while(((_m = _mm_movemask_epi8(_mm_cmpeq_epi8(_mm_set1_epi8(*_q), _dv))) & _mask) == 0) { _q++; } \
+		/* delimiter found, pass to _body */ \
+		char const *p = _p; \
+		uint64_t l = _q++ - _p; \
+		if(l > 0) { _body; i++; } \
+	} while((_m & 0x01) == 0); \
+}
+
+static
+char *mm_strdup(char const *p)
+{
+	if(!p) { return(NULL); }
+	uint64_t l = 0;
+	p--; while(*++p) { l++; }
+	char *a = (char *)malloc(l + 1);
+	printf("%llu\n", l);
+	memcpy(a, p - l, l);
+	a[l] = '\0';
+	printf("%s\n", a);
+	return(a);
+}
 
 #endif /* #ifndef _UTIL_H_INCLUDED */
 

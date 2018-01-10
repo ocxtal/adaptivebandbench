@@ -51,7 +51,7 @@ scalar_affine(
 	_e(curr, bw) = OFS + gi;					/* fix gap cells at (0, 0) */
 	_f(curr, bw) = OFS + gi;
 	int32_t max = OFS, smax = OFS;
-	uint64_t amax = 0;	/* max score and its position */
+	uint64_t amax = 0, bmax;					/* max score and its position */
 	for(uint64_t apos = 0; apos < alen; apos++) {
 		debug("apos(%llu)", apos);
 		int8_t ach = encode_a(a[apos]);
@@ -79,7 +79,7 @@ scalar_affine(
 			_s(curr, bofs) = pv < 0 ? 0 : pv;
 			_e(curr, bofs) = pe < 0 ? 0 : pe;
 			_f(curr, bofs) = pf < 0 ? 0 : pf;
-			max = MAX2(max, pv);
+			if(pv > max) { max = pv; amax = apos + 1; bmax = bofs - bw + apos + 1; }
 
 			debug("apos(%llu), bofs(%llu), e(%d), f(%d), s(%d), max(%d)", apos, bofs, pe - OFS, pf - OFS, pv - OFS, max - OFS);
 
@@ -88,29 +88,18 @@ scalar_affine(
 
 		/* update maxpos */
 		debug("max(%d), pm(%u)", max - OFS, smax);
-		if(max > smax) { smax = max; amax = apos + 1; }
 	}
 
 	/* save the maxpos */
 	maxpos_t *r = (maxpos_t *)work;
 	r->alen = alen;
 	r->blen = blen;
+	r->apos = amax;
+	r->bpos = bmax;
 	#ifdef debug
 		r->ccnt = alen * 2 * bw;
 		r->fcnt = 0;
 	#endif
-
-	base += _vlen() * amax;
-	debug("max(%d), amax(%llu)", max - OFS, amax);
-	for(uint64_t bofs = 0; bofs < bw; bofs++) {
-		if(_s(base, bofs) == max) {
-			r->apos = amax;
-			r->bpos = bofs - bw + amax;
-			debug("amax(%llu), bmax(%llu), bofs(%llu)", r->apos, r->bpos, bofs);
-			break;
-		}
-	}
-	debug("score(%d)", max - OFS);
 	return(max - OFS);
 }
 

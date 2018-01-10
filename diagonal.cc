@@ -44,15 +44,18 @@ diagonal_affine(
 		/* vector at p = 0 */
 		_s(prev, bw/2 - 1 - i) = OFS - (i + 1) * max_match + _gap((i + 1)*2);
 		_s(prev, bw/2     + i) = OFS -  i      * max_match + _gap( i     *2);
+		_e(prev, bw/2 - 1 - i) = 0;
+		_e(prev, bw/2     + i) = 0;
+		_f(prev, bw/2 - 1 - i) = 0;
+		_f(prev, bw/2     + i) = 0;
 
 		/* vectors at p = 1 */
 		_s(curr, bw/2 - 1 - i) = OFS - i * max_match + _gap(i*2 + 1);
 		_s(curr, bw/2     + i) = OFS - i * max_match + _gap(i*2 + 1);
-
-		_e(curr, bw/2 - 1 - i) = OFS - i * max_match + _gap(i*2 + 1);
-		_e(curr, bw/2     + i) = OFS - i * max_match + _gap(i*2 + 1);
-		_f(curr, bw/2 - 1 - i) = OFS - i * max_match + _gap(i*2 + 1);
-		_f(curr, bw/2     + i) = OFS - i * max_match + _gap(i*2 + 1);
+		_e(curr, bw/2 - 1 - i) = i == 0 ? OFS + _gap(1) : 0;
+		_e(curr, bw/2     + i) = 0;
+		_f(curr, bw/2 - 1 - i) = 0;
+		_f(curr, bw/2     + i) = i == 0 ? OFS + _gap(1) : 0;
 
 		/* char buffers */
 		abuf[bw/2 - 1 - i] = i < alen ? encode_a(a[i]) : 0;
@@ -71,10 +74,10 @@ diagonal_affine(
 
 		if(p & 0x01) {
 			debug("D");
-			bbuf[bw] = (p / 2 + bw / 2) < blen ? encode_b(b[p / 2 + bw / 2]) : 0;
+			bbuf[bw] = (p / 2 + bw / 2 - 1) < blen ? encode_b(b[p / 2 + bw / 2 - 1]) : -1;
 
 			char_vec cb((int8_t const *)&bbuf[0]);
-			vec ch(&_s(curr, 0)), ce(&_e(curr, 0)); ch -= giv;
+			vec ch(&_s(prev, 0)), ce(&_e(prev, 0)); ch -= giv;
 			for(uint64_t i = 0; i < bw; i += vec::LEN) {
 				debug("loop: %llu", i);
 
@@ -84,15 +87,15 @@ diagonal_affine(
 				th -= giv;						/* add gap-open, common for the two directions */
 
 				/* clear if the tail */
-				if(i + vec::LEN >= bw) { tb = cz; th = z; te = z; }
-				th.print("th"); te.print("te");
+				if(i + vec::LEN >= bw) { th = z; te = z; }
 
 				/* rotate the vectors to align the vectors */
 				char_vec vb = tb.dsr(cb);
 				vec pv = ch, ph = th.dsr(ch), pe = te.dsr(ce);
+
 				cb = tb; ch = th; ce = te;
 				vb.store(&bbuf[i]);				/* store shifted */
-				pv.print("pv"); pe.print("pe"); pf.print("pf");
+
 				va.print("a"); vb.print("b"); smv.shuffle(va | vb).print("score");
 
 				/* load the second previous */
@@ -100,10 +103,10 @@ diagonal_affine(
 				ppv += smv.shuffle(va | vb);
 
 				/* calc next */
-				vec ne = vec::max(ph, pe) - gev;
-				vec nf = vec::max(pv, pf) - gev;
-				ne.store(&_e(curr, i)); ne.print("ne");
-				nf.store(&_f(curr, i)); nf.print("nf");
+				vec ne = vec::max(ph, pe) - gev; ph.print("ph"); pe.print("pe"); ne.print("ne");
+				vec nf = vec::max(pv, pf) - gev; pv.print("pv"); pf.print("pf"); nf.print("nf");
+				ne.store(&_e(curr, i));
+				nf.store(&_f(curr, i));
 
 				/* update s */
 				vec nv = vec::max(vec::max(ne, nf), ppv);
@@ -113,23 +116,21 @@ diagonal_affine(
 			}
 		} else {
 			debug("R");
-			char_vec ca((int8_t)((p / 2 + bw / 2) < alen ? encode_a(a[p / 2 + bw / 2]) : 0));
+			char_vec ca((int8_t)((p / 2 + bw / 2 - 1) < alen ? encode_a(a[p / 2 + bw / 2 - 1]) : 0));
 			vec cv, cf;
 			for(uint64_t i = 0; i < bw; i += vec::LEN) {
 				debug("loop: %llu", i);
 
 				/* load the previous buffers */
 				char_vec ta((int8_t const *)&abuf[i]), vb((int8_t const *)&bbuf[i]);
-				vec tv(&_s(prev, i)), pe(&_e(prev, i)), tf(&_s(prev, i));
+				vec tv(&_s(prev, i)), pe(&_e(prev, i)), tf(&_f(prev, i));
 				tv -= giv;
-				tv.print("tv"); tf.print("tf");
 
 				/* rotate the vectors */
 				char_vec va = ta.dsl(ca);
 				vec ph = tv, pv = tv.dsl(cv), pf = tf.dsl(cf);
 				ca = ta; cv = tv; cf = pf;
 				va.store(&abuf[i]);				/* store shifted */
-				pv.print("pv"); pe.print("pe"); pf.print("pf");
 				va.print("a"); vb.print("b"); smv.shuffle(va | vb).print("score");
 
 				/* load the second previous */
@@ -137,10 +138,10 @@ diagonal_affine(
 				ppv += smv.shuffle(va | vb);
 
 				/* calc next */
-				vec ne = vec::max(ph, pe) - gev;
-				vec nf = vec::max(pv, pf) - gev;
-				ne.store(&_e(curr, i)); ne.print("ne");
-				nf.store(&_f(curr, i)); nf.print("nf");
+				vec ne = vec::max(ph, pe) - gev; ph.print("ph"); pe.print("pe"); ne.print("ne");
+				vec nf = vec::max(pv, pf) - gev; pv.print("pv"); pf.print("pf"); nf.print("nf");
+				ne.store(&_e(curr, i));
+				nf.store(&_f(curr, i));
 
 				/* update s */
 				vec nv = vec::max(vec::max(ne, nf), ppv);
@@ -173,8 +174,8 @@ diagonal_affine(
 		s.print("s");
 		if(s == t) {
 			uint64_t q = i + tzcnt(s == t) / 2 - bw / 2;
-			r->apos = pmax / 2 - q;
-			r->bpos = pmax / 2 + q;
+			r->apos =  pmax      / 2 - q;
+			r->bpos = (pmax + 1) / 2 + q;
 			debug("amax(%llu), bmax(%llu)", r->apos, r->bpos);
 			break;
 		}

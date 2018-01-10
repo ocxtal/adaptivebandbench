@@ -20,8 +20,8 @@ blast_affine(
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
-	int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt)
-	// int8_t m, int8_t x, int8_t gi, int8_t ge, int16_t xt)
+	int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt,
+	uint32_t bw)		/* unused */
 {
 	if(alen == 0 || blen == 0) { return(0); }
 	debug("%s, %s", a, b);
