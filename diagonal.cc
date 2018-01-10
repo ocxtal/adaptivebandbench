@@ -31,7 +31,7 @@ diagonal_affine(
 	#define _e(_p, _i)		( (_p)[    bw + (_i)] )
 	#define _f(_p, _i)		( (_p)[2 * bw + (_i)] )
 	#define _vlen()			( 3 * bw )
-	uint8_t abuf[bw + 1], bbuf[bw + 1];
+	uint8_t abuf[bw + vec::LEN], bbuf[bw + vec::LEN];
 
 	/* init the leftmost vector (vertically placed) */
 	uint16_t *base = (uint16_t *)((uint8_t *)work + sizeof(maxpos_t));
@@ -160,6 +160,10 @@ diagonal_affine(
 	maxpos_t *r = (maxpos_t *)work;
 	r->alen = alen;
 	r->blen = blen;
+	#ifdef debug
+		r->ccnt = bw * (alen + blen - 1);
+		r->fcnt = 0;
+	#endif
 
 	base += _vlen() * pmax;
 	uint16_t m = max.hmax();

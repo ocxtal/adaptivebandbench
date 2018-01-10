@@ -33,11 +33,10 @@ vertical_affine(
 	#define _e(_p, _i)		( (_p)[2 * bw + (_i)] )
 	#define _f(_p, _i)		( (_p)[4 * bw + (_i)] )
 	#define _vlen()			( 6 * bw )
-	uint8_t c[2 * bw + 1];
+	uint8_t c[2 * bw + vec::LEN];
 
 	/* init the leftmost vector (verticalically placed) */
 	uint16_t *base = (uint16_t *)((uint8_t *)work + sizeof(maxpos_t)), *curr = base, *prev = base;
-	int8_t margin = -2 * extract_min_score(score_matrix);
 	#define _gap(_i)		( ((_i) > 0 ? gi : 0) + (_i) * ge )
 	for(uint64_t i = 0; i < 2 * bw; i++) {
 		if(i < bw) {
@@ -113,6 +112,10 @@ vertical_affine(
 	maxpos_t *r = (maxpos_t *)work;
 	r->alen = alen;
 	r->blen = blen;
+	#ifdef debug
+		r->ccnt = alen * 2 * bw;
+		r->fcnt = 0;
+	#endif
 
 	base += _vlen() * amax;
 	uint16_t m = max.hmax();

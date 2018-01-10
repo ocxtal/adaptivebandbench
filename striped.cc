@@ -75,6 +75,9 @@ striped_affine(
 
 	vec const giv(-gi), gev(-ge);
 	vec max(OFS);
+	#ifdef DEBUG
+		uint64_t fcnt = 0;						/* lazy-f chain length */
+	#endif
 	for(uint64_t apos = 0; apos < alen; apos++) {
 		debug("apos(%llu)", apos);
 		char_vec av(encode_a(a[apos]));
@@ -124,6 +127,9 @@ striped_affine(
 			vec pv(&_s(curr, 0, bofs));
 			pv.print("pv"); pf.print("pf");
 			if(!(pv < (pf -= gev))) { break; }
+			#ifdef DEBUG
+				fcnt++;
+			#endif
 			pv = vec::max(pv, pf);				/* max score cannot be updated here because max is always  */
 			pv.store(&_s(curr, 0, bofs));
 			pf.store(&_f(curr, 0, bofs));
@@ -139,6 +145,10 @@ striped_affine(
 	maxpos_t *r = (maxpos_t *)work;
 	r->alen = alen;
 	r->blen = blen;
+	#ifdef DEBUG
+		r->ccnt = alen * 2 * bw;
+		r->fcnt = fcnt;
+	#endif
 
 	base += _vlen() * amax;
 	uint16_t m = max.hmax();
