@@ -129,7 +129,7 @@ diagonal_affine(
 				/* rotate the vectors */
 				char_vec va = ta.dsl(ca);
 				vec ph = tv, pv = tv.dsl(cv), pf = tf.dsl(cf);
-				ca = ta; cv = tv; cf = pf;
+				ca = ta; cv = tv; cf = tf;
 				va.store(&abuf[i]);				/* store shifted */
 				va.print("a"); vb.print("b"); smv.shuffle(va | vb).print("score");
 
