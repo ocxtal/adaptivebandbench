@@ -45,7 +45,7 @@ vertical_affine(
 		} else {
 			_s(curr, i) = _f(curr, i) = OFS + _gap(i - bw);
 			_e(curr, i) = 0;
-			c[i + 1] = (i - bw) < blen ? encode_b(b[i - bw]) : 0;
+			c[i + 1] = (i - bw) < blen ? encode_b(b[i - bw]) : encode_n();
 		}
 	}
 	_e(curr, bw) = OFS + gi;					/* fix gap cells at (0, 0) */
@@ -60,7 +60,7 @@ vertical_affine(
 		prev = curr; curr += _vlen();
 
 		/* fetch the next base */
-		c[bw] = (apos + bw) < blen ? encode_b(b[apos + bw]) : 0;
+		c[2 * bw] = (apos + bw - 1) < blen ? encode_b(b[apos + bw - 1]) : encode_n();
 
 		/* init f */
 		vec pf, cv(&_s(prev, 0)), ce(&_e(prev, 0));
