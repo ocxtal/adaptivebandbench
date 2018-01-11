@@ -88,15 +88,6 @@ striped_affine(
 		/* init f */
 		vec pf, pv, cv(&_s(prev, 0, 0));
 
-		#if 0
-		/* propagate initial gap to the end */
-		vec sc; sc.loadu(&_scv(apos % _blen(), apos / _blen(), ch));
-		pf = vec::max(cv, giv) + sc - giv; pf.print("pf(init)");
-		for(uint64_t i = 0; i < vec::LEN - 1; i++) {
-			pf = vec::max(pf, (pf<<1) - gebv); pf.print("pf(prop)");
-		}
-		#endif
-
 		/* speculative score calculation */
 		for(uint64_t bofs = 0; bofs < 2 * bw; bofs += vec::LEN) {
 			debug("bofs(%llu)", bofs);
