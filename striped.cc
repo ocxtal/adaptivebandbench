@@ -36,7 +36,7 @@ striped_affine(
 	#define _blen()			( 2 * bw / vec::LEN )	/* block height */
 
 	/* construct score profile vector */
-	uint64_t tlen = (blen + _blen() - 1) / _blen();
+	uint64_t tlen = (blen + 2 * bw - 1) / _blen();
 	if(tlen < vec::LEN) { tlen = vec::LEN; }
 
 	uint16_t *scv = (uint16_t *)((uint8_t *)work + sizeof(maxpos_t));
@@ -46,12 +46,12 @@ striped_affine(
 	for(uint64_t s = 0; s < _blen(); s++) {
 		for(uint64_t t = 0; t < tlen; t++) {
 			uint64_t i = t * _blen() + s;
-			int8_t ch = (i - bw) < blen ? encode_b(b[i - bw]) : -1;
+			int8_t ch = (i - bw) < blen ? encode_b(b[i - bw]) : encode_n();
 			debug("s(%llu), t(%llu), idx(%llu), pos(%llu), ch(%c)", s, t, t + s * tlen, i, (i - bw) < blen ? b[i - bw] : '-');
-			_scv(s, t, 0) = ch != -1 ? score_matrix[encode_a('A') | ch] : -1;
-			_scv(s, t, 1) = ch != -1 ? score_matrix[encode_a('C') | ch] : -1;
-			_scv(s, t, 2) = ch != -1 ? score_matrix[encode_a('G') | ch] : -1;
-			_scv(s, t, 3) = ch != -1 ? score_matrix[encode_a('T') | ch] : -1;
+			_scv(s, t, 0) = score_matrix[encode_a('A') | ch];
+			_scv(s, t, 1) = score_matrix[encode_a('C') | ch];
+			_scv(s, t, 2) = score_matrix[encode_a('G') | ch];
+			_scv(s, t, 3) = score_matrix[encode_a('T') | ch];
 		}
 	}
 
@@ -73,14 +73,13 @@ striped_affine(
 	_f(curr, bw % _blen(), bw / _blen()) = OFS + gi;
 	uint64_t smax = OFS, amax = 0;				/* max score and its position */
 
-	vec const giv(-gi), gev(-ge);
+	vec const giv(-gi), gev(-ge), gebv(-ge * _blen());
 	vec max(OFS);
 	#ifdef DEBUG
 		uint64_t fcnt = 0;						/* lazy-f chain length */
 	#endif
 	for(uint64_t apos = 0; apos < alen; apos++) {
 		debug("apos(%llu)", apos);
-		char_vec av(encode_a(a[apos]));
 		prev = curr; curr += _vlen();
 
 		/* fetch the next base */
@@ -119,25 +118,36 @@ striped_affine(
 			/* update max */
 			max = vec::max(max, pv);
 		}
-		pf <<= 1;								/* shift by one to move to the next block */
+
+		/* propagate gap to the end */
+		pf = vec::max(pf, pv - giv);
+		for(uint64_t i = 0; i < vec::LEN - 1; i++) {
+			pf = vec::max(pf, (pf<<1) - gebv); pf.print("pf(prop)");
+		}
 
 		/* lazy-f loop */
 		debug("lazy-f");
-		for(uint64_t bofs = 0; bofs < 2 * bw; bofs += vec::LEN) {
-			vec pv(&_s(curr, 0, bofs));
-			pv.print("pv"); pf.print("pf");
-			if(!(pv < (pf -= gev))) { break; }
-			#ifdef DEBUG
-				fcnt++;
-			#endif
-			pv = vec::max(pv, pf);				/* max score cannot be updated here because max is always  */
-			pv.store(&_s(curr, 0, bofs));
-			pf.store(&_f(curr, 0, bofs));
+		while(1) {
+			pf <<= 1;							/* shift by one to move to the next block */
+			for(uint64_t bofs = 0; bofs < 2 * bw; bofs += vec::LEN) {
+				vec pv(&_s(curr, 0, bofs)); pf -= gev;
+				pv.print("pv(raw)"); pf.print("pf(adjusted)");
+				debug("mask(%x)", pv < pf);
+				if((pv < pf) == 0) { goto _tail; }
+				#ifdef DEBUG
+					fcnt++;
+				#endif
+				pv = vec::max(pv, pf);			/* max score cannot be updated here because max is always  */
+				pv.print("pv(updated)");
+				pv.store(&_s(curr, 0, bofs));
+				pf.store(&_f(curr, 0, bofs));
+			}
 		}
+	_tail:;
 
 		/* update maxpos */
 		uint16_t m = max.hmax();
-		debug("m(%u), pm(%u)", m, smax);
+		debug("m(%d), pm(%d)", m - OFS, smax - OFS);
 		if(m > smax) { smax = m; amax = apos + 1; }
 	}
 
