@@ -62,6 +62,7 @@ int8_t encode_b(char b)
 {
 	return(0x0c & ((b<<1) ^ b));
 }
+#define encode_n()		( 0x09 )
 
 static inline
 void build_score_matrix(int8_t *matrix, int8_t m, int8_t x)
