@@ -232,10 +232,16 @@ public:
 	}
 	/* compare */
 	inline uint16_t operator<(vec const &b) const {
-		return(_mm_movemask_epi8(_mm_cmplt_epi16(v, b.get())));
+		__m128i _ofs = _mm_set1_epi16(32768);
+		__m128i _a = _mm_sub_epi16(v, _ofs);
+		__m128i _b = _mm_sub_epi16(b.get(), _ofs);
+		return(_mm_movemask_epi8(_mm_cmplt_epi16(_a, _b)));
 	}
 	inline uint16_t operator>(vec const &b) const {
-		return(_mm_movemask_epi8(_mm_cmpgt_epi16(v, b.get())));
+		__m128i _ofs = _mm_set1_epi16(32768);
+		__m128i _a = _mm_sub_epi16(v, _ofs);
+		__m128i _b = _mm_sub_epi16(b.get(), _ofs);
+		return(_mm_movemask_epi8(_mm_cmpgt_epi16(_a, _b)));
 	}
 	inline uint16_t operator<=(vec const &b) const { return(~operator>(b)); }
 	inline uint16_t operator>=(vec const &b) const { return(~operator<(b)); }
