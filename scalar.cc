@@ -87,7 +87,7 @@ scalar_affine(
 		}
 
 		/* update maxpos */
-		debug("max(%d), pm(%u)", max - OFS, smax);
+		debug("max(%d)", max - OFS);
 	}
 
 	/* save the maxpos */
