@@ -45,20 +45,20 @@ scalar_affine(
 		} else {
 			_s(curr, i) = _f(curr, i) = OFS + _gap(i - bw);
 			_e(curr, i) = 0;
-			c[i + 1] = (i - bw) < blen ? encode_b(b[i - bw]) : 0;
+			c[i + 1] = (i - bw) < blen ? encode_b(b[i - bw]) : encode_n();
 		}
 	}
 	_e(curr, bw) = OFS + gi;					/* fix gap cells at (0, 0) */
 	_f(curr, bw) = OFS + gi;
-	int32_t max = OFS, smax = OFS;
-	uint64_t amax = 0, bmax;					/* max score and its position */
+	int32_t max = OFS;
+	uint64_t amax = 0, bmax = 0;					/* max score and its position */
 	for(uint64_t apos = 0; apos < alen; apos++) {
 		debug("apos(%llu)", apos);
 		int8_t ach = encode_a(a[apos]);
 		prev = curr; curr += _vlen();
 
 		/* fetch the next base */
-		c[bw] = (apos + bw) < blen ? encode_b(b[apos + bw]) : 0;
+		c[2 * bw] = (apos + bw - 1) < blen ? encode_b(b[apos + bw - 1]) : encode_n();
 
 		/* init f */
 		int32_t pf = 0, pv = 0, pd = _s(prev, 0);
@@ -69,7 +69,7 @@ scalar_affine(
 			int32_t ph = bofs < (2 * bw - 1) ? _s(prev, bofs + 1) : 0;
 			int32_t pe = bofs < (2 * bw - 1) ? _e(prev, bofs + 1) : 0;
 			int32_t score = score_matrix[ach | c[bofs + 1]];
-			debug("pd(%d), ph(%d), pe(%d), score(%d)", pd - OFS, ph - OFS, pe - OFS, score - OFS);
+			debug("(%c, %c), pd(%d), ph(%d), pe(%d), score(%d)", "ACGT"[ach], "ACGT"[c[bofs + 1]>>2], pd - OFS, ph - OFS, pe - OFS, score - OFS);
 
 			c[bofs] = c[bofs + 1];				/* shift by one */
 
