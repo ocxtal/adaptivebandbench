@@ -392,9 +392,21 @@ void calc_score(struct params_s *params)
 	kv_reserve(params->apos, kv_size(params->seq) / 2);
 	kv_reserve(params->bpos, kv_size(params->seq) / 2);
 	#ifndef OMIT_SCORE
-		parasail_matrix_t *_matrix = parasail_matrix_create("ACGT", params->m, params->x);
+		// parasail_matrix_t *_matrix = parasail_matrix_create("ACGT", params->m, params->x);
 		#pragma omp parallel for
 		for(uint64_t i = 0; i < kv_size(params->seq) / 2; i++) {
+
+			sw_result_t a = sw_affine(
+				(char const *)kv_at(params->seq, i * 2),     kv_at(params->len, i * 2),
+				(char const *)kv_at(params->seq, i * 2 + 1), kv_at(params->len, i * 2 + 1),
+				params->score_matrix, params->gi, params->ge
+			);
+			kv_at(params->ascore, i) = a.score;
+			kv_at(params->apos, i) = a.apos;
+			kv_at(params->bpos, i) = a.bpos;
+			free(a.path);
+
+			/* parasail has a bug
 			parasail_result *r = parasail_sg_striped_sse41_128_16(
 				(char const *)kv_at(params->seq, i * 2),     kv_at(params->len, i * 2),
 				(char const *)kv_at(params->seq, i * 2 + 1), kv_at(params->len, i * 2 + 1),
@@ -406,6 +418,7 @@ void calc_score(struct params_s *params)
 			kv_at(params->apos, i) = r->end_query + 1;
 			kv_at(params->bpos, i) = r->end_ref + 1;
 			parasail_result_free(r);
+			*/
 		}
 	#else
 		for(i = 0; i < kv_size(params->seq) / 2; i++) {
@@ -446,21 +459,14 @@ void bench_function(struct params_s *params, struct mapping_s *map, char const *
 		bench_end(b);
 		score += s;
 
-		debug("a(%s), b(%s)", kv_at(params->seq, i * 2), kv_at(params->seq, i * 2 + 1));
-
-		sw_result_t a = sw_affine(
-			(char const *)kv_at(params->seq, i * 2),     kv_at(params->len, i * 2),
-			(char const *)kv_at(params->seq, i * 2 + 1), kv_at(params->len, i * 2 + 1),
-			params->score_matrix, params->gi, params->ge
-		);
-
-		struct maxpos_s *mp = (struct maxpos_s *)params->work;
-		fprintf(stderr, "i(%llu), score(%d, %d, %d), apos(%llu, %llu, %llu, %llu), bpos(%llu, %llu, %llu, %llu)\n",
-			i, s, kv_at(params->ascore, i), a.score,
-			mp->apos, kv_at(params->apos, i), a.apos, kv_at(params->len, i * 2),
-			mp->bpos, kv_at(params->bpos, i), a.bpos, kv_at(params->len, i * 2 + 1));
-
-		free(a.path);
+		if(s != kv_at(params->ascore, i)) {
+			struct maxpos_s *mp = (struct maxpos_s *)params->work;
+			debug("a(%s), b(%s)", kv_at(params->seq, i * 2), kv_at(params->seq, i * 2 + 1));
+			debug("i(%llu), score(%d, %d), apos(%llu, %llu), bpos(%llu, %llu)",
+				i, s, kv_at(params->ascore, i),
+				mp->apos, kv_at(params->apos, i),
+				mp->bpos, kv_at(params->bpos, i));
+		}
 	}
 	bench_end(b);
 	print_bench(params->flag, name, bench_get(b), score);
