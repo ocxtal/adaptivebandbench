@@ -1,4 +1,3 @@
-#define DEBUG
 
 /**
  * @file main.cc
@@ -247,8 +246,8 @@ struct params_s {
 	int8_t score_matrix[16];
 	int m, x, gi, ge, xt;
 	uint32_t bw;
-	uint64_t max_cnt, max_len;
-	uint64_t flag, rdseed, pipe;
+	uint64_t max_cnt, max_len, tail_len;
+	uint64_t flag, rdseed, pipe, revcomp;
 	char *list;
 
 	uint8_v buf;
@@ -269,9 +268,11 @@ void init_args(struct params_s *p)
 	p->bw = 32;
 	p->max_len = 10000;
 	p->max_cnt = 1000;
+	p->tail_len = 0;
 	p->flag = 0;
 	p->rdseed = 0;
 	p->pipe = 0;
+	p->revcomp = 0;
 	p->list = mm_strdup("scalar,vertical,diagonal,striped,adaptive,blast,simdblast");
 
 	kv_init(p->buf);
@@ -315,6 +316,8 @@ int parse_args(struct params_s *p, int c, char *arg)
 		case 'x': p->xt = atoi(arg); break;
 		case 'r': p->rdseed = atoi(arg); break;
 		case 'i': p->pipe = 1; break;
+		case 'R': p->revcomp = 1; break;
+		case 't': p->tail_len = atoi(arg); break;
 	}
 	return(0);
 }
@@ -322,22 +325,20 @@ int parse_args(struct params_s *p, int c, char *arg)
 uint64_t read_seq(struct params_s *params)
 {
 	int c;
-	uint64_t const rl = 100;
-
 	uint64_t base = 0, i = 0;
 	while((c = getchar()) != EOF) {
 		if(c == '\n') {
 			uint64_t l = MIN2(params->max_len, kv_size(params->buf) - base);
-			if(kv_size(params->seq) & 0x02) {
+			if(params->revcomp && kv_size(params->seq) & 0x02) {
 				revcomp((char *)&kv_at(params->buf, base), kv_size(params->buf) - base);
 			}
 
-			for(i = 0; i < rl; i++) {
+			for(i = 0; i < params->tail_len; i++) {
 				kv_push(params->buf, rbase());
 			}
-			kv_push(params->len, l + rl);
+			kv_push(params->len, l + params->tail_len);
 			kv_push(params->seq, (void *)base);
-			params->buf.n = base + l + rl;
+			params->buf.n = base + l + params->tail_len;
 			kv_push(params->buf, '\0');
 			base = kv_size(params->buf);
 		} else {
@@ -488,7 +489,7 @@ int main(int argc, char *argv[])
 	int i;
 	struct params_s params __attribute__(( aligned(16) ));
 	init_args(&params);
-	while((i = getopt(argc, argv, "l:c:s:a:n:b:x:r:i:")) != -1) {
+	while((i = getopt(argc, argv, "l:c:san:b:x:r:iRt:")) != -1) {
 		if(parse_args(&params, i, optarg) != 0) { exit(1); }
 	}
 
@@ -501,7 +502,7 @@ int main(int argc, char *argv[])
 	);
 
 	uint64_t cnt;
-	if(argc > 1 && params.pipe != 0) {
+	if(params.pipe != 0) {
 		cnt = read_seq(&params);
 	} else {
 		cnt = simulate_seq(&params);
