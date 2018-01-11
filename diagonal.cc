@@ -58,10 +58,10 @@ diagonal_affine(
 		_f(curr, bw/2     + i) = i == 0 ? OFS + _gap(1) : 0;
 
 		/* char buffers */
-		abuf[bw/2 - 1 - i] = i < alen ? encode_a(a[i]) : 0;
+		abuf[bw/2 - 1 - i] = i < alen ? encode_a(a[i]) : encode_n();
 		abuf[bw/2     + i] = 0;
 		bbuf[bw/2 - 1 - i] = 0;
-		bbuf[bw/2     + i] = i < blen ? encode_b(b[i]) : 0;
+		bbuf[bw/2     + i] = i < blen ? encode_b(b[i]) : encode_n();
 	}
 	uint64_t smax = OFS, pmax = 0;				/* max score and its position */
 
@@ -74,7 +74,7 @@ diagonal_affine(
 
 		if(p & 0x01) {
 			debug("D");
-			bbuf[bw] = (p / 2 + bw / 2 - 1) < blen ? encode_b(b[p / 2 + bw / 2 - 1]) : -1;
+			bbuf[bw] = (p / 2 + bw / 2 - 1) < blen ? encode_b(b[p / 2 + bw / 2 - 1]) : encode_n();
 
 			char_vec cb((int8_t const *)&bbuf[0]);
 			vec ch(&_s(prev, 0)), ce(&_e(prev, 0)); ch -= giv;
@@ -116,7 +116,7 @@ diagonal_affine(
 			}
 		} else {
 			debug("R");
-			char_vec ca((int8_t)((p / 2 + bw / 2 - 1) < alen ? encode_a(a[p / 2 + bw / 2 - 1]) : 0));
+			char_vec ca((int8_t)((p / 2 + bw / 2 - 1) < alen ? encode_a(a[p / 2 + bw / 2 - 1]) : encode_n()));
 			vec cv, cf;
 			for(uint64_t i = 0; i < bw; i += vec::LEN) {
 				debug("loop: %llu", i);
