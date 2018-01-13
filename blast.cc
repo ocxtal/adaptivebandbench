@@ -20,108 +20,96 @@ blast_affine(
 	uint64_t alen,
 	char const *b,
 	uint64_t blen,
-	int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt,
+	int8_t *score_matrix, int8_t _gi, int8_t _ge, int16_t _xt,
 	uint32_t bw)		/* unused */
 {
 	if(alen == 0 || blen == 0) { return(0); }
 	debug("%s, %s", a, b);
 
-	uint64_t i, a_size, first_a_index, last_a_index, a_index, b_index;
-	int16_t best_score, score, next_score, score_gap_row, score_gap_col;
+	int32_t gi = _gi, ge = _ge, xt = _xt, best_score = 0;
+	uint64_t first_a_index = 0, last_a_index = alen + 1;		/* [first_a_index, last_a_index) */
+	uint64_t amax = 0, bmax = 0;
 
-	struct _dp {
-		int16_t best;
-		int16_t best_gap;
-	};
-	// struct _dp *mat = (struct _dp *)malloc((alen + 2) * (blen + 1) * sizeof(struct _dp));
-	struct _dp *ptr = (struct _dp *)work, *prev;
+	struct _dp { int16_t s, e, f; };
+	struct _dp *ptr = (struct _dp *)work + sizeof(maxpos_t), *prev;
 
-	/* initialize top row */
-	ptr[0].best = (score = 0); ptr[0].best_gap = gi;
-	score += gi + ge;
-	for(i = 1; i <= alen; i++) {
-		if(0 - score > xt) { break; }
-		ptr[i].best = score; ptr[i].best_gap = score + gi;
-		score += ge;
+	/* initialize the top row */
+	ptr[0].s = 0; ptr[0].e = gi; ptr[0].f = gi;
+	for(uint64_t i = 0; i < alen; i++) {
+		if(ptr[i].s + ge < -xt) { last_a_index = i + 1; break; }
+		ptr[i + 1].s = ptr[i].e + ge;
+		ptr[i + 1].e = ptr[i].e + ge;
+		ptr[i + 1].f = MIN;
 	}
 
-	a_size = last_a_index = i;
-	first_a_index = 0;
-	next_score = MIN;
-	best_score = 0;
+	#define _sc(_i, _bch)		( score_matrix[encode_a(a[_i]) | _bch] )
 
-	for(b_index = 1; b_index <= blen; b_index++) {
-		prev = ptr; ptr += (last_a_index + 1 - first_a_index);
-		last_a_index = first_a_index;
+	ptr[last_a_index].s = best_score;
+	ptr[last_a_index].e = last_a_index - first_a_index;
+	ptr[last_a_index].f = first_a_index;
+	prev = ptr;
+	for(uint64_t b_index = 0; b_index < blen; b_index++) {
+		int8_t bch = encode_b(b[b_index]);
+		debug("b_index(%llu), ch(%d), a_range(%llu, %llu)", b_index, bch, first_a_index, last_a_index);
+		prev = ptr;
 
-		score = MIN;
-		score_gap_row = MIN;
-		if(first_a_index != 0) {
-			// score = next_score + (a[0] == b[b_index-1] ? m : x);
-			score = next_score + score_matrix[encode_a(a[0]) | encode_b(b[b_index-1])];
+		int32_t e = MIN;
+		int32_t f = MAX2(MIN, MAX2(prev[first_a_index].f, prev[first_a_index].s + gi) + ge);
+		int32_t s = f;
+		debug("initial, a_index(%llu), score(%d, %d, %d)", first_a_index, s, e, f);
+		while(s < best_score - xt) {
+			e = MAX2(e, s + gi) + ge;
+			f = MAX2(prev[first_a_index + 1].f, prev[first_a_index + 1].s + gi) + ge;
+			s = MAX3(prev[first_a_index].s + _sc(first_a_index, bch), e, f);
+			first_a_index++;
+			debug("forward head, a_index(%llu), ch(%x), score(%d, %d, %d)", first_a_index, encode_a(a[first_a_index]) | bch, s, e, f);
 		}
-		debug("first_next_score(%d)", next_score);
-		next_score = MIN;
 
-		for(a_index = first_a_index; a_index < a_size; a_index++) {
+		ptr += last_a_index - first_a_index;
+		debug("ptr(%p, %p), a_range(%llu, %llu)", prev, ptr, first_a_index, last_a_index);
+		ptr[first_a_index].s = s;
+		ptr[first_a_index].e = e;
+		ptr[first_a_index].f = f;
 
-			/* calc f */
-			int16_t prev_best = prev[a_index].best;
-			score_gap_col = prev[a_index].best_gap + ge;
-			if(score_gap_col < prev_best + gi + ge) { score_gap_col = prev_best + gi + ge; }
-			ptr[a_index].best_gap = score_gap_col;
+		uint64_t next_last_a_index = first_a_index;
+		for(uint64_t a_index = first_a_index + 1; a_index < last_a_index; a_index++) {
+			e = MAX2(e, s + gi) + ge;
+			f = MAX2(prev[a_index].f, prev[a_index].s + gi) + ge;
+			s = MAX3(prev[a_index - 1].s + _sc(a_index - 1, bch), e, f);
+			if(s > best_score) { best_score = s; amax = a_index; bmax = b_index + 1; }
+			if(s >= best_score - xt) { next_last_a_index = a_index + 1; }
 
-			/* update d */
-			if(score < score_gap_col) { score = score_gap_col; }
+			ptr[a_index].s = s;
+			ptr[a_index].e = e;
+			ptr[a_index].f = f;
+			debug("fill, a_index(%llu, %p, %p), ch(%x), score(%d, %d, %d)", a_index, &ptr[a_index].s, &prev[a_index].s, encode_a(a[a_index - 1]) | bch, s, e, f);
+		}
+		last_a_index = next_last_a_index;
 
-			debug("(%llu, %llu), row(%d), col(%d), diag(%d)", a_index, b_index, score_gap_row, score_gap_col, score);
+		if(last_a_index <= alen) {
+			int32_t d = prev[last_a_index - 1].s + _sc(last_a_index - 1, bch);
+			if(d > best_score) { best_score = d; amax = last_a_index; bmax = b_index + 1; }
+			while(last_a_index <= alen) {
+				e = MAX2(e, s + gi) + ge;
+				f = MIN;
+				s = MAX2(d, e);
+				if(s < best_score - xt) { debug("xdrop failed, s(%d, %d)", s, best_score - xt); break; }
 
-			debug("updated score(%d)", score);
-
-			/* xdrop test */
-			if(best_score - score > xt) {
-				ptr[a_index].best = MIN;
-				if(a_index == first_a_index) {
-					next_score = score;
-					first_a_index++;
-				}
-			} else {
-				last_a_index = a_index;
-				ptr[a_index].best = score;
-				/* update best score */
-				if(score > best_score) { best_score = score; }
+				d = MIN;
+				ptr[last_a_index].s = s;
+				ptr[last_a_index].e = e;
+				ptr[last_a_index].f = f;
+				last_a_index++;
+				debug("forward tail, a_index(%llu, %p), score(%d, %d, %d)", last_a_index, &ptr[last_a_index - 1].s, s, e, f);
 			}
-
-			/* calc e */
-			score_gap_row += ge;
-			if(score_gap_row < score + gi + ge) { score_gap_row = score + gi + ge; }
-
-			/* calc next score */
-			// score = prev_best + (a[a_index] == b[b_index-1] ? m : x);
-			score = prev_best + score_matrix[encode_a(a[a_index]) | encode_b(b[b_index-1])];
-			if(score < score_gap_row) { score = score_gap_row; }
-		}
-
-		if(first_a_index == a_size) { break; }
-		if(last_a_index < a_size - 1) {
-			a_size = last_a_index + 1;
-		} else {
-			while((best_score - score <= xt) && a_size <= alen) {
-				ptr[a_size].best = (score += gi + ge);
-				ptr[a_size].best_gap = (score_gap_row += ge);
-				if(score < score_gap_row) { score = score_gap_row; }
-				a_size++;
-			}
-			last_a_index = a_size;
-		}
-
-		if(a_size <= alen) {
-			ptr[a_size].best = MIN;
-			ptr[a_size].best_gap = MIN;
-			a_size++;
 		}
 	}
-	// free(mat);
+	/* save the maxpos */
+	maxpos_t *r = (maxpos_t *)work;
+	r->alen = alen;
+	r->blen = blen;
+	r->apos = amax;
+	r->bpos = bmax;
 
 	return(best_score);
 }
