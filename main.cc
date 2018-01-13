@@ -1,3 +1,4 @@
+#define DEBUG
 
 /**
  * @file main.cc
@@ -501,11 +502,10 @@ int main(int argc, char *argv[])
 		params.max_len, params.max_cnt
 	);
 
-	uint64_t cnt;
 	if(params.pipe != 0) {
-		cnt = read_seq(&params);
+		read_seq(&params);
 	} else {
-		cnt = simulate_seq(&params);
+		simulate_seq(&params);
 	}
 
 	/* collect scores with full-sized dp */
