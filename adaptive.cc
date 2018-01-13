@@ -62,7 +62,7 @@ adaptive_affine(
 		w[i / L].pv[i % L] =      (_Q(i) < 0 ? -_Q(i)   : _Q(i)) * (2*gi - sc_max) + OFS;
 		w[i / L].cv[i % L] = gi + (_Q(i) < 0 ? -_Q(i)-1 : _Q(i)) * (2*gi - sc_max) + OFS;
 		w[i / L].ce[i % L] = gi + (_Q(i) < 0 ? -_Q(i)-1 : _Q(i) + 1) * (2*gi - sc_max) + OFS;
-		w[i / L].cf[i % L] = gi + (_Q(i) < 0 ? -_Q(i) : _Q(i)) * (2*gi - sc_max) + OFS;
+		w[i / L].cf[i % L] = gi + (_Q(i) < 0 ? -_Q(i)   : _Q(i)) * (2*gi - sc_max) + OFS;
 		debug("pv(%d), cv(%d)", w[i / L].pv[i % L], w[i / L].cv[i % L]);
 	}
 	#undef _Q
