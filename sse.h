@@ -136,9 +136,11 @@ public:
 	inline void loadu(void const *ptr) {
 		load(ptr);
 	}
-	inline void load_encode_a(void const *ptr) {
+	inline void load_encode_a(void const *ptr, uint64_t len) {
 		load(ptr);
+		len = len > 8 ? 8 : len; len--;
 		v = 0x0303030303030303 & ((v>>1) ^ (v>>2));
+		v = 0x0909090909090900<<8*len;
 	}
 	inline void store(void *ptr) const {
 		*((uint64_t *)ptr) = v;
