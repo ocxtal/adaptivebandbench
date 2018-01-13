@@ -1,4 +1,4 @@
-
+#define DEBUG
 /**
  * @file simdblast.cc
  *
@@ -55,39 +55,11 @@ simdblast_affine(
 		int16_t best[vec::LEN];
 		int16_t best_gap[vec::LEN];
 	};
-	// struct _dp *mat = (struct _dp *)aligned_malloc(
-		// (roundup(alen + 1, vec::LEN) / vec::LEN + 2) * (blen + 1) * sizeof(struct _dp),
-		// vec::SIZE);
 	struct _dp *ptr = (struct _dp *)work, *prev = (struct _dp *)work + roundup(alen, vec::LEN) / vec::LEN;
-	// memset(mat, 0, roundup(alen, vec::LEN) / vec::LEN * roundup(blen, vec::LEN) * sizeof(struct _dp));
 
 	debug("%llu, %llu, %llu, %llu, %lu", alen, roundup((alen + 1), vec::LEN), roundup((alen + 1), vec::LEN) / vec::LEN + 1, blen, sizeof(struct _dp));
 
 	/* init top row */
-	/*
-	int16_t const init[vec::LEN] __attribute__(( aligned(16) )) = {
-		OFS,
-		OFS + gi + ge,
-		OFS + gi + 2*ge,
-		OFS + gi + 3*ge,
-		OFS + gi + 4*ge,
-		OFS + gi + 5*ge,
-		OFS + gi + 6*ge
-		OFS + gi + 7*ge,
-	};
-	int16_t const init_g[vec::LEN] __attribute__(( aligned(16) )) = {
-		OFS + gi,
-		OFS + gi + ge,
-		OFS + gi + 2*ge,
-		OFS + gi + 3*ge,
-		OFS + gi + 4*ge,
-		OFS + gi + 5*ge,
-		OFS + gi + 6*ge,
-		OFS + gi + 7*ge,
-	};
-	*/
-	// vec init_v; init_v.load(init);
-	// vec init_gv; init_gv.load(init_g);
 	vec init_v = ofsv - (giv<<1) - acc_gev;
 	init_v.store(&ptr[0].best);
 	(init_v - giv).store(&ptr[0].best_gap);
@@ -126,7 +98,7 @@ simdblast_affine(
 			/* load prev vector */
 			vec pv; pv.load(&prev[a_index].best);
 			vec pf; pf.load(&prev[a_index].best_gap);
-			pv.print();
+			pv.print("pv");
 
 			/* calc f */
 			vec score_gap_col_v = vec::max(pv - giv, pf) - gev;
@@ -135,12 +107,8 @@ simdblast_affine(
 			score_gap_row_v = (vec::max(score_v - giv, score_gap_row_v) - gev)>>7;
 
 			/* calc d */
-			// score_v = prev_pv>>7 | pv<<1;
 			score_v = pv.dsl(prev_pv);
-			// vec av('A');
-			// vec av; av.load_expand(&a[a_index * vec::LEN]);
-			// score_v += vec::comp(prev_av>>7 | av<<1, bv).select(mv, xv);
-			char_vec av; av.load_encode_a(&a[a_index * vec::LEN]);
+			char_vec av; av.load_encode_a(&a[a_index * vec::LEN], a_size - a_index * vec::LEN);
 			score_v += smv.shuffle(av.dsl(prev_av) | bv);
 			score_v = vec::max(score_v, score_gap_col_v);
 
@@ -178,7 +146,7 @@ simdblast_affine(
 		if(last_a_index < a_size - 1) {
 			a_size = last_a_index + 1;
 		} else {
-			score_v.print(); score_gap_row_v.print();
+			score_v.print("pv (raw)"); score_gap_row_v.print("gap_v (raw)");
 			while((best_score_v - score_v <= xtv) && a_size <= roundup(alen + 1, vec::LEN) / vec::LEN) {
 				score_v = (vec::max(score_v - giv, score_gap_row_v) - gev)>>7;
 				score_v.set(score_v[0]);
