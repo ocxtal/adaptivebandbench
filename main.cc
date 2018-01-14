@@ -1,4 +1,3 @@
-#define DEBUG
 
 /**
  * @file main.cc
