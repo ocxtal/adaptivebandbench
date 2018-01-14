@@ -139,14 +139,14 @@ public:
 	inline void load_encode_a(void const *ptr, uint64_t len) {
 		load(ptr);
 		len = len > 8 ? 8 : len; len--;
-		v = 0x0303030303030303 & ((v>>1) ^ (v>>2));
-		v = 0x0909090909090900<<8*len;
+		v = (0x0303030303030303>>8*(7 - len)) & ((v>>1) ^ (v>>2));
+		v |= 0x0909090909090900<<8*len;
 	}
 	inline void load_encode_b(void const *ptr, uint64_t len) {
 		load(ptr);
 		len = len > 8 ? 8 : len; len--;
-		v = 0x0c0c0c0c0c0c0c0c & ((v<<1) ^ v);
-		v = 0x0909090909090900<<8*len;
+		v = (0x0c0c0c0c0c0c0c0c>>8*(7 - len)) & ((v<<1) ^ v);
+		v |= 0x0909090909090900<<8*len;
 	}
 	inline void store(void *ptr) const {
 		*((uint64_t *)ptr) = v;
