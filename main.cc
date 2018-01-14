@@ -460,8 +460,8 @@ void bench_function(struct params_s *params, struct mapping_s *map, char const *
 		bench_end(b);
 		score += s;
 
-		if(s != kv_at(params->ascore, i)) {
-			struct maxpos_s *mp = (struct maxpos_s *)params->work;
+		maxpos_t *mp = (maxpos_t *)params->work;
+		if(s != kv_at(params->ascore, i) || mp->apos != kv_at(params->apos, i) || mp->bpos != kv_at(params->bpos, i)) {
 			debug("a(%s), b(%s)", kv_at(params->seq, i * 2), kv_at(params->seq, i * 2 + 1));
 			debug("i(%llu), score(%d, %d), apos(%llu, %llu), bpos(%llu, %llu)",
 				i, s, kv_at(params->ascore, i),
