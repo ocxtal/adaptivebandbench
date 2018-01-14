@@ -1,4 +1,4 @@
-#define DEBUG
+
 /**
  * @file blast.cc
  *
@@ -49,9 +49,9 @@ blast_affine(
 	#define _sc(_ach, _i)		( score_matrix[_ach | encode_b(b[_i])] )
 	prev = ptr;
 	for(uint64_t a_index = 0; a_index < alen; a_index++) {
+		prev = ptr; ptr += last_b_index + 1 - first_b_index;
 		int8_t ach = encode_a(a[a_index]);
 		debug("a_index(%llu), ch(%d), b_range(%llu, %llu)", a_index, ach, first_b_index, last_b_index);
-		prev = ptr;
 
 		int32_t e = MAX2(MIN, MAX2(prev[first_b_index].e, prev[first_b_index].s + gi) + ge);
 		int32_t f = MIN;
@@ -61,17 +61,16 @@ blast_affine(
 			e = MAX2(prev[first_b_index + 1].e, prev[first_b_index + 1].s + gi) + ge;
 			f = MAX2(f, s + gi) + ge;
 			s = MAX3(prev[first_b_index].s + _sc(ach, first_b_index), e, f);
-			first_b_index++;
+			first_b_index++; ptr--;
 			debug("forward head, b_index(%llu), ch(%x), score(%d, %d, %d)", first_b_index, encode_b(b[first_b_index]) | ach, s, e, f);
 		}
 
-		ptr += last_b_index + 1 - first_b_index;
 		debug("ptr(%p, %p), b_range(%llu, %llu)", prev, ptr, first_b_index, last_b_index);
 		ptr[first_b_index].s = s;
 		ptr[first_b_index].e = e;
 		ptr[first_b_index].f = f;
 
-		uint64_t next_last_b_index = first_b_index;
+		uint64_t next_last_b_index = last_b_index;
 		for(uint64_t b_index = first_b_index + 1; b_index < last_b_index; b_index++) {
 			e = MAX2(prev[b_index].e, prev[b_index].s + gi) + ge;
 			f = MAX2(f, s + gi) + ge;
