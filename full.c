@@ -51,8 +51,8 @@ sw_result_t sw_affine(
 		mat[f(0, j)] = MAX2(min, gi + (j - 1) * ge + gi - ge - 1);
 	}
 
-	for(uint64_t j = 1; j < blen+1; j++) {
-		for(uint64_t i = 1; i < alen+1; i++) {
+	for(uint64_t i = 1; i < alen+1; i++) {
+		for(uint64_t j = 1; j < blen+1; j++) {
 			int16_t score_f = mat[f(i, j)] = MAX2(
 				mat[a(i - 1, j)] + gi,
 				mat[f(i - 1, j)] + ge);
