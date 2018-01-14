@@ -34,7 +34,6 @@ simdblast_affine(
 	if(alen == 0 || blen == 0) { return(0); }
 	debug("%s, %s", a, b);
 
-	uint64_t i, a_size, first_a_index, last_a_index, a_index, b_index;
 	vec const xtv(xt), zv, ofsv(OFS), smv((uint16_t const *)score_matrix);
 	vec const giv(-gi), gev(-ge), gev2(-2*ge), gev4(-4*ge), gev8(-8*ge);
 	int16_t const acc_ge[vec::LEN] __attribute__(( aligned(16) )) = {
@@ -48,14 +47,8 @@ simdblast_affine(
 		(int16_t)(-7*ge)
 	};
 	vec acc_gev((uint16_t const *)acc_ge);
-
-	int8_t sc_min = extract_min_score(score_matrix);
-
-
-
 	uint64_t vblen = roundup(blen, vec::LEN) / vec::LEN;
 	uint64_t first_b_index = 0, last_b_index = vblen;		/* [first_b_index, last_b_index) */
-	uint64_t amax = 0, bmax = 0;
 
 	struct _dp {
 		uint16_t s[vec::LEN], e[vec::LEN], f[vec::LEN];
@@ -77,9 +70,14 @@ simdblast_affine(
 		init_ev.store(ptr[i + 1].e);
 		init_pv.store(ptr[i + 1].f);
 	}
+	ptr[last_b_index].s[0] = OFS;
+	ptr[last_b_index].s[1] = last_b_index - first_b_index;
+	ptr[last_b_index].s[2] = first_b_index;
 
 	#define _gap(_i)		( ((_i) > 0 ? gi : 0) + (_i) * ge )
 	vec max(OFS);
+	uint64_t amax = 0;
+	struct _dp *bmax = ptr + last_b_index;
 	for(uint64_t a_index = 0; a_index < alen; a_index++) {
 		debug("a_index(%llu), ch(%c), b_range(%llu, %llu)", a_index, a[a_index], first_b_index, last_b_index);
 
@@ -106,10 +104,6 @@ simdblast_affine(
 		}
 
 		vec ch(OFS + _gap(a_index)), pv, pe, pf, mv(max[0]);
-/*		if(first_b_index > 0) {
-			ch.load(prev[first_b_index - 1].s); ch.print("initial ch");
-		}*/
-
 		while(1) {
 			_update_vector(first_b_index);
 			if((pv < max - xt) != 0xffff) { break; }
@@ -157,15 +151,31 @@ simdblast_affine(
 			}
 		}
 
-		max.set(mv.hmax());
+		int32_t m = mv.hmax();
+		if(m > max[0]) { amax = a_index + 1; bmax = ptr + last_b_index; }
+		max.set(m);
+
+		ptr[last_b_index].s[0] = m;
+		ptr[last_b_index].s[1] = last_b_index - first_b_index;
+		ptr[last_b_index].s[2] = first_b_index;
 	}
 
+	debug("bmax(%p, %d, %d, %d)", bmax, bmax->s[0] - OFS, bmax->s[1], bmax->s[2]);
 	maxpos_t *r = (maxpos_t *)work;
 	r->alen = alen;
 	r->blen = blen;
-	// r->apos = amax;
-	// r->bpos = bmax;
-
+	r->apos = 0;
+	r->bpos = 0;
+	struct _dp *bbase = bmax - bmax->s[1];
+	for(uint64_t b_index = 0; b_index < bmax->s[1]; b_index++) {
+		vec pv(bbase[b_index].s);
+		pv.print("pv (search)");
+		if(pv == max) {
+			r->apos = amax;
+			r->bpos = vec::LEN * (bmax->s[2] + b_index) + (tzcnt(pv == max)>>1) + 1;
+			break;
+		}
+	}
 	return(max[0] - OFS);
 }
 
