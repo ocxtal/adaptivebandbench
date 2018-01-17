@@ -218,10 +218,8 @@ char *mm_strdup(char const *p)
 	uint64_t l = 0;
 	p--; while(*++p) { l++; }
 	char *a = (char *)malloc(l + 1);
-	printf("%llu\n", l);
 	memcpy(a, p - l, l);
 	a[l] = '\0';
-	printf("%s\n", a);
 	return(a);
 }
 
