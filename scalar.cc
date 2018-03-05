@@ -35,7 +35,7 @@ scalar_affine(
 	#define _vlen()			( 6 * bw )
 	uint8_t c[2 * bw + vec::LEN];
 
-	/* init the leftmost vector (scalarically placed) */
+	/* init the leftmost vector */
 	uint16_t *base = (uint16_t *)((uint8_t *)work + sizeof(maxpos_t)), *curr = base, *prev = base;
 	#define _gap(_i)		( ((_i) > 0 ? gi : 0) + (_i) * ge )
 	for(uint64_t i = 0; i < 2 * bw; i++) {
@@ -73,12 +73,12 @@ scalar_affine(
 
 			c[bofs] = c[bofs + 1];				/* shift by one */
 
-			pe = MAX3(0, ph + gi, pe) + ge;
-			pf = MAX3(0, pv + gi, pf) + ge;
+			pe = MAX2(0, MAX2(ph + gi, pe) + ge);
+			pf = MAX2(0, MAX2(pv + gi, pf) + ge);
 			pv = MAX4(0, pd + score, pe, pf);
-			_s(curr, bofs) = pv < 0 ? 0 : pv;
-			_e(curr, bofs) = pe < 0 ? 0 : pe;
-			_f(curr, bofs) = pf < 0 ? 0 : pf;
+			_s(curr, bofs) = pv;
+			_e(curr, bofs) = pe;
+			_f(curr, bofs) = pf;
 			if(pv > max) { max = pv; amax = apos + 1; bmax = bofs - bw + apos + 1; }
 
 			debug("apos(%llu), bofs(%llu), e(%d), f(%d), s(%d), max(%d)", apos, bofs, pe - OFS, pf - OFS, pv - OFS, max - OFS);
