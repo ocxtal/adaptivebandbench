@@ -42,6 +42,7 @@ int striped_affine(_base_signature);
 int blast_affine(_base_signature);
 int simdblast_affine(_base_signature);
 int adaptive_affine(_base_signature);
+int simdadaptive_affine(_base_signature);
 
 /* wrapper of Myers' wavefront algorithm */
 extern "C" {
@@ -273,7 +274,7 @@ void init_args(struct params_s *p)
 	p->rdseed = 0;
 	p->pipe = 0;
 	p->revcomp = 0;
-	p->list = mm_strdup("scalar,vertical,diagonal,striped,adaptive,blast,simdblast");
+	p->list = mm_strdup("scalar,vertical,diagonal,striped,adaptive,simdadaptive,blast,simdblast");
 
 	kv_init(p->buf);
 	kv_init(p->seq);
@@ -482,7 +483,7 @@ int main(int argc, char *argv[])
 		/* static banded w/ standard matrix */
 		fn(scalar), fn(vertical), fn(diagonal), fn(striped),
 		/* non-standard banded */
-		fn(blast), fn(simdblast), fn(adaptive)
+		fn(blast), fn(simdblast), fn(adaptive), fn(simdadaptive)
 	};
 	#undef fn
 

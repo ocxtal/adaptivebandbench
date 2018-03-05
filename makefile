@@ -4,7 +4,7 @@ CXX=g++
 CFLAGS=-Wall -Wno-unused-function -std=c99 -O3 -msse4.1 -fopenmp
 CXXFLAGS=-Wall -Wno-unused-function -std=gnu++11 -O3 -msse4.1 -fopenmp
 
-BENCH_SRCS=main.cc blast.cc simdblast.cc adaptive.cc scalar.cc vertical.cc diagonal.cc striped.cc
+BENCH_SRCS=main.cc blast.cc simdblast.cc adaptive.cc simdadaptive.cc scalar.cc vertical.cc diagonal.cc striped.cc
 BENCH_MODULES=wave/DB.o wave/QV.o wave/align.o ssw.o parasail/cpuid.o parasail/io.o parasail/matrix_lookup.o parasail/memory.o parasail/memory_sse.o parasail/time.o sg_striped_sse41_128_16.o full.o
 
 all: bench
