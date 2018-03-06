@@ -214,7 +214,7 @@ void revcomp(char *seq, int len)
 		p++; q--;
 	}
 
-	if(p == q) { *p = map[*p]; }
+	if(p == q) { *p = map[(uint64_t)*p]; }
 	return;
 }
 
