@@ -46,6 +46,10 @@ blast_affine(
 	ptr[last_b_index].e = last_b_index - first_b_index;
 	ptr[last_b_index].f = first_b_index;
 
+	#ifdef DEBUG_CNT
+		uint64_t ccnt = last_b_index - first_b_index;
+	#endif
+
 	#define _sc(_ach, _i)		( score_matrix[_ach | encode_b(b[_i])] )
 	prev = ptr;
 	for(uint64_t a_index = 0; a_index < alen; a_index++) {
@@ -107,6 +111,10 @@ blast_affine(
 		ptr[last_b_index].s = best_score;
 		ptr[last_b_index].e = last_b_index - first_b_index;
 		ptr[last_b_index].f = first_b_index;
+
+		#ifdef DEBUG_CNT
+			ccnt += last_b_index - first_b_index;
+		#endif
 	}
 	/* save the maxpos */
 	maxpos_t *r = (maxpos_t *)work;
@@ -114,6 +122,10 @@ blast_affine(
 	r->blen = blen;
 	r->apos = amax;
 	r->bpos = bmax;
+	#ifdef DEBUG_CNT
+		r->ccnt = ccnt;
+		r->fcnt = 0;
+	#endif
 	return(best_score);
 }
 

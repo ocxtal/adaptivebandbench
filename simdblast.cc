@@ -74,6 +74,10 @@ simdblast_affine(
 	ptr[last_b_index].s[1] = last_b_index - first_b_index;
 	ptr[last_b_index].s[2] = first_b_index;
 
+	#ifdef DEBUG_CNT
+		uint64_t ccnt = last_b_index - first_b_index;
+	#endif
+
 	#define _gap(_i)		( ((_i) > 0 ? gi : 0) + (_i) * ge )
 	vec max(OFS);
 	uint64_t amax = 0;
@@ -158,6 +162,10 @@ simdblast_affine(
 		ptr[last_b_index].s[0] = m;
 		ptr[last_b_index].s[1] = last_b_index - first_b_index;
 		ptr[last_b_index].s[2] = first_b_index;
+
+		#ifdef DEBUG_CNT
+			ccnt += last_b_index - first_b_index;
+		#endif
 	}
 
 	debug("bmax(%p, %d, %d, %d)", bmax, bmax->s[0] - OFS, bmax->s[1], bmax->s[2]);
@@ -166,6 +174,11 @@ simdblast_affine(
 	r->blen = blen;
 	r->apos = 0;
 	r->bpos = 0;
+	#ifdef DEBUG_CNT
+		r->ccnt = ccnt * vec::LEN;
+		r->fcnt = 0;
+	#endif
+
 	struct _dp *bbase = bmax - bmax->s[1];
 	for(uint64_t b_index = 0; b_index < bmax->s[1]; b_index++) {
 		vec pv(bbase[b_index].s);

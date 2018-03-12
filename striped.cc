@@ -75,10 +75,17 @@ striped_affine(
 
 	vec const giv(-gi), gev(-ge), gebv(-ge * _blen());
 	vec max(OFS);
-	#ifdef DEBUG
+	#ifdef DEBUG_CNT
 		uint64_t fcnt = 0;						/* lazy-f chain length */
+		bench_t body, lazyf;
+		bench_init(body);
+		bench_init(lazyf);
 	#endif
 	for(uint64_t apos = 0; apos < alen; apos++) {
+		#ifdef DEBUG_CNT
+			bench_start(body);
+		#endif
+
 		debug("apos(%llu)", apos);
 		prev = curr; curr += _vlen();
 
@@ -125,6 +132,11 @@ striped_affine(
 			pf = vec::max(pf, (pf<<1) - gebv); pf.print("pf(prop)");
 		}
 
+		#ifdef DEBUG_CNT
+			bench_end(body);
+			bench_start(lazyf);
+		#endif
+
 		/* lazy-f loop */
 		debug("lazy-f");
 		while(1) {
@@ -134,7 +146,7 @@ striped_affine(
 				pv.print("pv(raw)"); pf.print("pf(adjusted)");
 				debug("mask(%x)", pv < pf);
 				if((pv - giv < pf) == 0) { goto _tail; }
-				#ifdef DEBUG
+				#ifdef DEBUG_CNT
 					fcnt++;
 				#endif
 				pv = vec::max(pv, pf);			/* max score cannot be updated here because max is always  */
@@ -149,15 +161,21 @@ striped_affine(
 		uint16_t m = max.hmax();
 		debug("m(%d), pm(%d)", m - OFS, smax - OFS);
 		if(m > smax) { smax = m; amax = apos + 1; }
+
+		#ifdef DEBUG_CNT
+			bench_end(lazyf);
+		#endif
 	}
 
 	/* save the maxpos */
 	maxpos_t *r = (maxpos_t *)work;
 	r->alen = alen;
 	r->blen = blen;
-	#ifdef DEBUG
+	#ifdef DEBUG_CNT
 		r->ccnt = alen * 2 * bw;
-		r->fcnt = fcnt;
+		r->fcnt = fcnt * vec::LEN;
+		r->time[0] = bench_get(body) / 1000;
+		r->time[1] = bench_get(lazyf) / 1000;
 	#endif
 
 	base += _vlen() * amax;

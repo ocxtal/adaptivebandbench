@@ -230,10 +230,14 @@ int print_msg(int flag, char const *fmt, ...)
 	return(r);
 }
 
-int print_bench(int flag, char const *name, int64_t b, int64_t score)
+int print_bench(int flag, char const *name, int64_t b, int64_t score, uint64_t *cnt)
 {
 	if(flag == 0) {
-		return(printf("%s\t%ld\t%ld\n", name, b / 1000, score));
+		#ifdef DEBUG_CNT
+			return(printf("%s\t%ld\t%ld\t%lu\t%lu\t%lu\t%lu\n", name, b / 1000, score, cnt[0], cnt[1], cnt[2], cnt[3]));
+		#else
+			return(printf("%s\t%ld\t%ld\n", name, b / 1000, score));
+		#endif
 	} else if(flag == 1) {
 		return(printf("%ld\n", b / 1000));
 	} else if(flag == 2) {
@@ -449,6 +453,12 @@ void bench_function(struct params_s *params, struct mapping_s *map, char const *
 	int64_t score = 0;
 	bench_t b;
 	bench_init(b);
+	uint64_t cnt[4] = { 0 };
+	#ifdef DEBUG_CNT
+		struct maxpos_s *w = (struct maxpos_s *)params->work;
+		w->time[0] = 0; w->time[1] = 0;
+	#endif
+
 	for(uint64_t i = 0; i < kv_size(params->seq) / 2; i++) {
 		bench_start(b);
 		int32_t s = map->fp(params->work,
@@ -460,6 +470,12 @@ void bench_function(struct params_s *params, struct mapping_s *map, char const *
 		);
 		bench_end(b);
 		score += s;
+		#ifdef DEBUG_CNT
+			cnt[0] += w->ccnt;
+			cnt[1] += w->fcnt;
+			cnt[2] += w->time[0];
+			cnt[3] += w->time[1];
+		#endif
 
 		maxpos_t *mp = (maxpos_t *)params->work;
 		if(s != kv_at(params->ascore, i) || mp->apos != kv_at(params->apos, i) || mp->bpos != kv_at(params->bpos, i)) {
@@ -471,7 +487,7 @@ void bench_function(struct params_s *params, struct mapping_s *map, char const *
 		}
 	}
 	bench_end(b);
-	print_bench(params->flag, name, bench_get(b), score);
+	print_bench(params->flag, name, bench_get(b), score, cnt);
 	return;
 }
 

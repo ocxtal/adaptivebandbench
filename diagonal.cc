@@ -161,7 +161,7 @@ diagonal_affine(
 	maxpos_t *r = (maxpos_t *)work;
 	r->alen = alen;
 	r->blen = blen;
-	#ifdef debug
+	#ifdef DEBUG_CNT
 		r->ccnt = bw * (alen + blen - 1);
 		r->fcnt = 0;
 	#endif

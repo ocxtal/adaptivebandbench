@@ -23,6 +23,7 @@ typedef struct maxpos_s {
 	uint64_t alen, blen;
 	uint64_t ccnt;				/** #cells calculated */
 	uint64_t fcnt;				/** lazy-f count for debugging */
+	uint64_t time[2];
 	char *path;
 	uint64_t path_length;
 } maxpos_t;

@@ -112,7 +112,7 @@ vertical_affine(
 	maxpos_t *r = (maxpos_t *)work;
 	r->alen = alen;
 	r->blen = blen;
-	#ifdef debug
+	#ifdef DEBUG_CNT
 		r->ccnt = alen * 2 * bw;
 		r->fcnt = 0;
 	#endif

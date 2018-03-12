@@ -152,7 +152,7 @@ adaptive_affine(
 	r->blen = blen;
 	r->apos = amax;
 	r->bpos = bmax - bw + 1;
-	#ifdef debug
+	#ifdef DEBUG_CNT
 		r->ccnt = (apos + bpos - bw) * bw;
 		r->fcnt = 0;
 	#endif
