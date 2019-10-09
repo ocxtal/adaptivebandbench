@@ -11,9 +11,12 @@
  *
  ********************************************************************************************/
 
+#define _POSIX_C_SOURCE     200809L
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <math.h>
 #include <unistd.h>
 
@@ -870,10 +873,10 @@ int QVcoding_Scan(FILE *input, int num, FILE *temp)
 
   //  Zero histograms
 
-  bzero(delHist,sizeof(uint64)*256);
-  bzero(mrgHist,sizeof(uint64)*256);
-  bzero(insHist,sizeof(uint64)*256);
-  bzero(subHist,sizeof(uint64)*256);
+  memset(delHist,0,sizeof(uint64)*256);
+  memset(mrgHist,0,sizeof(uint64)*256);
+  memset(insHist,0,sizeof(uint64)*256);
+  memset(subHist,0,sizeof(uint64)*256);
 
   for (i = 0; i < 256; i++)
     delRun[i] = subRun[i] = 1;
@@ -898,7 +901,7 @@ int QVcoding_Scan(FILE *input, int num, FILE *temp)
         { EPRINTF(EPLACE,"Line %d: Header in quiv file is missing\n",Nline);
           EXIT(1);
         }
-      slash = index(Read+1,'/');
+      slash = strchr(Read+1,'/');
       if (slash == NULL)
   	{ EPRINTF(EPLACE,"%s: Line %d: Header line incorrectly formatted ?\n",
                          Prog_Name,Nline);

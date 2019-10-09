@@ -11,9 +11,12 @@
  *
  ********************************************************************************************/
 
+#define _POSIX_C_SOURCE     200809L
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <ctype.h>
 #include <unistd.h>
 #include <dirent.h>
@@ -94,7 +97,7 @@ char *PathTo(char *name)
 
   if (name == NULL)
     return (NULL);
-  if ((find = rindex(name,'/')) != NULL)
+  if ((find = strrchr(name,'/')) != NULL)
     { *find = '\0';
       path = Strdup(name,"Extracting path from");
       *find = '/';
@@ -110,7 +113,7 @@ char *Root(char *name, char *suffix)
 
   if (name == NULL)
     return (NULL);
-  find = rindex(name,'/');
+  find = strrchr(name,'/');
   if (find == NULL)
     find = name;
   else
@@ -376,7 +379,7 @@ int Open_DB(char* path, HITS_DB *db)
     root = Root(path,".db");
   pwd = PathTo(path);
 
-  bptr = rindex(root,'.');
+  bptr = strrchr(root,'.');
   if (bptr != NULL && bptr[1] != '\0' && bptr[1] != '-')
     { part = strtol(bptr+1,&fptr,10);
       if (*fptr != '\0' || part == 0)
@@ -668,7 +671,7 @@ static int Late_Track_Trim(HITS_DB *db, HITS_TRACK *track, int ispart)
   else
     allflag = DB_BEST;
 
-  root = rindex(db->path,'/') + 2;
+  root = strrchr(db->path,'/') + 2;
   indx = Fopen(Catenate(db->path,"","",".idx"),"r");
   fseeko(indx,sizeof(HITS_DB) + sizeof(HITS_READ)*db->ufirst,SEEK_SET);
   if (ispart)
@@ -857,7 +860,7 @@ int Load_QVs(HITS_DB *db)
   coding = NULL;
   qvtrk  = NULL;
 
-  root = rindex(db->path,'/') + 2;
+  root = strrchr(db->path,'/') + 2;
   istub = Fopen(Catenate(db->path,"/",root,".db"),"r");
   if (istub == NULL)
     goto error;

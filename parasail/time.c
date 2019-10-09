@@ -49,13 +49,13 @@ double parasail_time(void)
     mach_port_deallocate(mach_task_self(), cclock);
     return (double)(mts.tv_sec) + (double)(mts.tv_nsec)/1000000000.0;
 #elif defined(__FreeBSD__)
-    struct timespec ts;
+    struct timespec ts = { 0 };
     /* Works on FreeBSD */
     long retval = clock_gettime(CLOCK_MONOTONIC, &ts);
     assert(0 == retval);
     return (double)(ts.tv_sec) + (double)(ts.tv_nsec)/1000000000.0;
 #else
-    struct timespec ts;
+    struct timespec ts = { 0 };
     /* Works on Linux */
     // long retval = clock_gettime(CLOCK_REALTIME, &ts);
     // assert(0 == retval);
