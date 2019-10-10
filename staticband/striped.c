@@ -5,7 +5,6 @@
  * @brief striped parallelization of the standard banded matrix
  */
 #include <string.h>
-#include "sse.h"
 #include "util.h"
 #include "log.h"
 
@@ -29,15 +28,15 @@ striped_affine(
 	debug("%s, %s", a, b);
 
 	/* s: score vector, e: horizontal gap, f: stripedical gap */
-	#define _s(_p, _s, _t)	( (_p)[         (_s) * vec::LEN + (_t)] )
-	#define _e(_p, _s, _t)	( (_p)[2 * bw + (_s) * vec::LEN + (_t)] )
-	#define _f(_p, _s, _t)	( (_p)[4 * bw + (_s) * vec::LEN + (_t)] )
+	#define _s(_p, _s, _t)	( (_p)[         (_s) * VLEN + (_t)] )
+	#define _e(_p, _s, _t)	( (_p)[2 * bw + (_s) * VLEN + (_t)] )
+	#define _f(_p, _s, _t)	( (_p)[4 * bw + (_s) * VLEN + (_t)] )
 	#define _vlen()			( 6 * bw )
-	#define _blen()			( 2 * bw / vec::LEN )	/* block height */
+	#define _blen()			( 2 * bw / VLEN )	/* block height */
 
 	/* construct score profile vector */
 	uint64_t tlen = (blen + 2 * bw - 1) / _blen();
-	if(tlen < vec::LEN) { tlen = vec::LEN; }
+	if(tlen < VLEN) { tlen = VLEN; }
 
 	uint16_t *scv = (uint16_t *)((uint8_t *)work + sizeof(maxpos_t));
 	uint16_t *base = scv + 4 * _blen() * tlen;
@@ -66,15 +65,17 @@ striped_affine(
 			_s(curr, s, t) = _f(curr, s, t) = OFS + _gap(i - bw);
 			_e(curr, s, t) = 0;
 		}
-		debug("i(%llu), s(%llu), t(%llu), ofs(%llu), s(%d, %d, %d)", i, s, t, s * vec::LEN + t, _s(curr, s, t) - 32768, _e(curr, s, t) - 32768, _f(curr, s, t) - 32768);
+		debug("i(%llu), s(%llu), t(%llu), ofs(%llu), s(%d, %d, %d)", i, s, t, s * VLEN + t, _s(curr, s, t) - 32768, _e(curr, s, t) - 32768, _f(curr, s, t) - 32768);
 	}
 	/* fix gap cells at (0, 0) */
 	_e(curr, bw % _blen(), bw / _blen()) = OFS + gi;
 	_f(curr, bw % _blen(), bw / _blen()) = OFS + gi;
 	uint64_t smax = OFS, amax = 0;				/* max score and its position */
 
-	vec const giv(-gi), gev(-ge), gebv(-ge * _blen());
-	vec max(OFS);
+	vdp_t const giv  = seta_vdp(-1 * gi);
+	vdp_t const gev  = seta_vdp(-1 * ge);
+	vdp_t const gebv = seta_vdp(-1 * ge * _blen());
+	vdp_t max = seta_vdp(OFS);
 	#ifdef DEBUG_CNT
 		uint64_t fcnt = 0;						/* lazy-f chain length */
 		bench_t body, lazyf;
@@ -93,43 +94,53 @@ striped_affine(
 		int8_t ch = encode_a(a[apos]);
 
 		/* init f */
-		vec pf, pv, cv(&_s(prev, 0, 0));
+		vdp_t pf = zero_vdp();
 
 		/* speculative score calculation */
-		for(uint64_t bofs = 0; bofs < 2 * bw; bofs += vec::LEN) {
+		for(size_t bofs = 0; bofs < 2 * bw; bofs += VLEN) {
 			debug("bofs(%llu)", bofs);
 			/* load prev vectors */
-			vec ph(&_s(prev, 1, bofs)), pe(&_e(prev, 1, bofs));
-			if(bofs + vec::LEN >= 2 * bw) {
-				ph.load(&_s(prev, 0, 0)); ph >>= 1;
-				pe.load(&_e(prev, 0, 0)); pe >>= 1;
+			vdp_t pv = load_vdp(&_s(prev, 0, bofs));
+			vdp_t pe = load_vdp(&_e(prev, 1, bofs));
+			if(bofs + VLEN >= 2 * bw) {
+				pe = load_vdp(&_e(prev, 0, 0));
+				pe = bsr_vdp(pe, 1);
 			}
 
+			print_vdp(pv);
+			print_vdp(pe);
+
 			/* load score */
-			uint64_t s = (apos + bofs / vec::LEN) % _blen(), t = (apos + bofs / vec::LEN) / _blen();
+			size_t const s = (apos + bofs / VLEN) % _blen();
+			size_t const t = (apos + bofs / VLEN) / _blen();
 
-			vec sc; sc.loadu(&_scv(s, t, ch)); sc.print("sc");
-			cv = vec::max(cv, giv);				/* ensure not rounded by adding the score profile */
-			sc += cv; cv = ph; sc.print("pv (tentative)q");
+			vdp_t const sc = loadu_vdp(&_scv(s, t, ch));
+			pv = max_vdp(pv, giv);				/* ensure not rounded by adding the score profile */
+			pv = add_vdp(pv, sc);
 
-			/* calc e and f */
-			pe = vec::max(ph - giv, pe) - gev;
-			pf = vec::max(pv - giv, pf) - gev;
-			pe.store(&_e(curr, 0, bofs)); pe.print("pe");
-			pf.store(&_f(curr, 0, bofs)); pf.print("pf");
+			pe = sub_vdp(pe, gev);
+			pf = sub_vdp(pf, gev);
+			pv = max_vdp(pv, max_vdp(pe, pf));
+			pe = max_vdp(pe, sub_vdp(pv, giv));
+			pf = max_vdp(pf, sub_vdp(pv, giv));
 
-			/* calc s */
-			pv = vec::max(sc, vec::max(pe, pf));
-			pv.store(&_s(curr, 0, bofs)); pv.print("pv");
+			print_vdp(add_vdp(sc, seta_vdp(32768)));
+			print_vdp(pv);
+			print_vdp(pe);
+			print_vdp(pf);
+
+			store_vdp(&_s(curr, 0, bofs), pv);
+			store_vdp(&_e(curr, 0, bofs), pe);
+			store_vdp(&_f(curr, 0, bofs), pf);
 
 			/* update max */
-			max = vec::max(max, pv);
+			max = max_vdp(max, pv);
 		}
 
 		/* propagate gap to the end */
-		pf = vec::max(pf, pv - giv);
-		for(uint64_t i = 0; i < vec::LEN - 1; i++) {
-			pf = vec::max(pf, (pf<<1) - gebv); pf.print("pf(prop)");
+		for(size_t i = 0; i < VLEN - 1; i++) {
+			vdp_t const tf = sub_vdp(bsl_vdp(pf, 1), gebv);
+			pf = max_vdp(pf, tf);
 		}
 
 		#ifdef DEBUG_CNT
@@ -140,25 +151,25 @@ striped_affine(
 		/* lazy-f loop */
 		debug("lazy-f");
 		while(1) {
-			pf <<= 1;							/* shift by one to move to the next block */
-			for(uint64_t bofs = 0; bofs < 2 * bw; bofs += vec::LEN) {
-				vec pv(&_s(curr, 0, bofs)); pf -= gev;
-				pv.print("pv(raw)"); pf.print("pf(adjusted)");
-				debug("mask(%x)", pv < pf);
-				if((pv - giv < pf) == 0) { goto _tail; }
+			pf = bsl_vdp(pf, 1);				/* shift by one to move to the next block */
+			for(size_t bofs = 0; bofs < 2 * bw; bofs += VLEN) {
+				vdp_t pv = load_vdp(&_s(curr, 0, bofs));
+				pf = sub_vdp(pf, gev);
+				if(gt_vdp(pf, sub_vdp(pv, giv)) == 0) { goto _tail; }
+				// if((pv - giv < pf) == 0) { goto _tail; }
+
 				#ifdef DEBUG_CNT
 					fcnt++;
 				#endif
-				pv = vec::max(pv, pf);			/* max score cannot be updated here because max is always  */
-				pv.print("pv(updated)");
-				pv.store(&_s(curr, 0, bofs));
-				pf.store(&_f(curr, 0, bofs));
+				pv = max_vdp(pv, pf);			/* max score cannot be updated here because max is always  */
+				store_vdp(&_s(curr, 0, bofs), pv);
+				store_vdp(&_f(curr, 0, bofs), pf);
 			}
 		}
 	_tail:;
 
 		/* update maxpos */
-		uint16_t m = max.hmax();
+		uint16_t m = hmax_vdp(max);
 		debug("m(%d), pm(%d)", m - OFS, smax - OFS);
 		if(m > smax) { smax = m; amax = apos + 1; }
 
@@ -173,21 +184,21 @@ striped_affine(
 	r->blen = blen;
 	#ifdef DEBUG_CNT
 		r->ccnt = alen * 2 * bw;
-		r->fcnt = fcnt * vec::LEN;
+		r->fcnt = fcnt * VLEN;
 		r->time[0] = bench_get(body) / 1000;
 		r->time[1] = bench_get(lazyf) / 1000;
 	#endif
 
 	base += _vlen() * amax;
-	uint16_t m = max.hmax();
+	uint16_t const m = hmax_vdp(max);
 	debug("m(%u), amax(%llu)", m, amax);
-	for(uint64_t bofs = 0; bofs < bw; bofs += vec::LEN) {
-		vec s(&_s(base, 0, bofs)), t(m);
-		s.print("s");
-		if(s == t) {
+	for(uint64_t bofs = 0; bofs < bw; bofs += VLEN) {
+		vdp_t const s = load_vdp(&_s(base, 0, bofs));
+		vdp_t const t = seta_vdp(m);
+		if(eq_vdp(s, t)) {
 			r->apos = amax;
-			r->bpos = (tzcnt(s == t) / 2) * _blen() + bofs / vec::LEN - bw + amax;
-			debug("amax(%llu), bmax(%llu), mask(%hx), bofs(%llu)", r->apos, r->bpos, s == t, bofs);
+			r->bpos = (tzcnt(eq_vdp(s, t)) / 2) * _blen() + bofs / VLEN - bw + amax;
+			debug("amax(%llu), bmax(%llu), mask(%hx), bofs(%llu)", r->apos, r->bpos, eq_vdp(s, t), bofs);
 			break;
 		}
 	}
@@ -202,13 +213,13 @@ int main_ext(int argc, char *argv[])
 {
 	uint64_t alen = strlen(argv[2]);
 	uint64_t blen = strlen(argv[3]);
-	char *a = (char *)malloc(alen + vec::LEN + 1);
-	char *b = (char *)malloc(blen + vec::LEN + 1);
+	char *a = (char *)malloc(alen + VLEN + 1);
+	char *b = (char *)malloc(blen + VLEN + 1);
 
 	memcpy(a, argv[2], alen);
-	memset(a + alen, 0, vec::LEN + 1);
+	memset(a + alen, 0, VLEN + 1);
 	memcpy(b, argv[3], blen);
-	memset(b + blen, 0x80, vec::LEN + 1);
+	memset(b + blen, 0x80, VLEN + 1);
 
 	int8_t score_matrix[16] __attribute__(( aligned(16) ));
 	build_score_matrix(score_matrix, atoi(argv[4]), atoi(argv[5]));

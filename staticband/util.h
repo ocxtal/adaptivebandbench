@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <stddef.h>				/** offsetof */
 #include <string.h>				/** memset, memcpy */
-#include <smmintrin.h>
+#include <x86intrin.h>
 
 
 #define cat_intl(x, y)		x##_##y
@@ -30,7 +30,7 @@ typedef struct { __m128i v; } vchar_t;		/* lower half */
 typedef struct { __m128i v; } vmat_t;
 
 #define zero_vdp()			((vdp_t){ .v = _mm_setzero_si128() })
-#define seta_vdp(x)			((vdp_t){ .v = _mm_set1_epi16(x) })
+#define seta_vdp(x)			((vdp_t){ .v = _mm_set1_epi16((uint16_t)(x)) })
 #define load_vdp(p)			((vdp_t){ .v = _mm_load_si128((__m128i const *)(p)) })
 #define loadu_vdp(p)		((vdp_t){ .v = _mm_loadu_si128((__m128i const *)(p)) })
 #define store_vdp(p, x)		{ _mm_store_si128((__m128i *)(p), (x).v); }
@@ -43,7 +43,7 @@ typedef struct { __m128i v; } vmat_t;
 #define sub_vdp(x, y)		((vdp_t){ .v = _mm_subs_epu16((x).v, (y).v) })
 #define max_vdp(x, y)		((vdp_t){ .v = _mm_max_epu16((x).v, (y).v) })
 #define eq_vdp(x, y)		( (uint64_t)_mm_movemask_epi8(_mm_cmpeq_epi16((x).v, (y).v)) )
-#define gt_vdp(x, y)		( (uint64_t)_mm_movemask_epi8(_mm_cmpgt_epi16(_mm_sub_epi16((x).v, _mm_set1_epi16(32768), _mm_sub_epi16((y).v, _mm_set1_epi16(32768))) )
+#define gt_vdp(x, y)		( (uint64_t)_mm_movemask_epi8(_mm_cmpgt_epi16(_mm_sub_epi16((x).v, _mm_set1_epi16(32768)), _mm_sub_epi16((y).v, _mm_set1_epi16(32768)))) )
 
 static inline
 uint16_t hmax_vdp(vdp_t v)
@@ -53,6 +53,22 @@ uint16_t hmax_vdp(vdp_t v)
 	t = _mm_max_epu16(t, _mm_srli_si128(t, 4));
 	t = _mm_max_epu16(t, _mm_srli_si128(t, 2));
 	return((uint16_t)_mm_extract_epi16(t, 0));
+}
+
+#define print_vdp(x) { \
+	uint16_t buf[8]; \
+	storeu_vdp(buf, x); \
+	fprintf(stderr, \
+		"%s[%d, %d, %d, %d, %d, %d, %d, %d]\n", #x, \
+		buf[7] - 32768, \
+		buf[6] - 32768, \
+		buf[5] - 32768, \
+		buf[4] - 32768, \
+		buf[3] - 32768, \
+		buf[2] - 32768, \
+		buf[1] - 32768, \
+		buf[0] - 32768 \
+	); \
 }
 
 
@@ -74,6 +90,9 @@ uint16_t hmax_vdp(vdp_t v)
 
 #define cvt_vchar_vmat(x)	((vmat_t){ .v = (x).v })
 #define cvt_vmat_vdp(x)		((vdp_t){ .v = _mm_cvtepi8_epi16((x).v) })
+
+
+
 
 
 #elif defined(BENCH_ARCH_AVX)
