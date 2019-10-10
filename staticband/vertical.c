@@ -61,7 +61,7 @@ vertical_affine(
 
 	for(uint64_t apos = 0; apos < alen; apos++) {
 		debug("apos(%llu)", apos);
-		vchar_t const av = seta_vchar(encode_a(a[apos]));
+		vchar_t const va = seta_vchar(encode_a(a[apos]));
 		prev = curr; curr += _vlen();
 
 		/* fetch the next base */
@@ -82,9 +82,9 @@ vertical_affine(
 			ce = te;
 
 			/* calc score */
-			vchar_t const bv = loadu_vchar(&c[bofs + 1]);
-			store_vchar(&c[bofs], bv);			/* shift by one */
-			vchar_t const xt = or_vchar(av, bv);
+			vchar_t const vb = loadu_vchar(&c[bofs + 1]);
+			store_vchar(&c[bofs], vb);			/* shift by one */
+			vchar_t const xt = or_vchar(va, vb);
 			vmat_t const yt  = shuffle_vmat(smv, cvt_vchar_vmat(xt));
 
 			print_vdp(pe);

@@ -84,8 +84,8 @@ uint16_t hmax_vdp(vdp_t v)
 #define storeu_vchar(p, x)	{ _mm_storel_epi64((__m128i *)(p), (x).v); }
 // #define bsl_vchar(x, y)		((vchar_t){ .v = _mm_slli_si128((x).v, (y)) })
 // #define bsr_vchar(x, y)		((vchar_t){ .v = _mm_srli_si128((x).v, (y)) })
-#define bsld_vchar(x, y)	((vchar_t){ .v = _mm_srli_si128(_mm_unpack_epi64((y).v, (x).v), 7) })
-#define bsrd_vchar(x, y)	((vchar_t){ .v = _mm_srli_si128(_mm_unpack_epi64((y).v, (x).v), 1) })
+#define bsld_vchar(x, y)	((vchar_t){ .v = _mm_srli_si128(_mm_unpacklo_epi64((y).v, (x).v), 7) })
+#define bsrd_vchar(x, y)	((vchar_t){ .v = _mm_srli_si128(_mm_unpacklo_epi64((y).v, (x).v), 1) })
 #define or_vchar(x, y)		((vchar_t){ .v = _mm_or_si128((x).v, (y).v) })
 
 

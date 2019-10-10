@@ -5,8 +5,8 @@
  * @brief diagonal parallelization of the standard banded matrix
  */
 #include <string.h>
-#include "sse.h"
 #include "util.h"
+#include "log.h"
 
 #define MIN 	( 0 )
 #define OFS 	( 32768 )
@@ -31,7 +31,7 @@ diagonal_affine(
 	#define _e(_p, _i)		( (_p)[    bw + (_i)] )
 	#define _f(_p, _i)		( (_p)[2 * bw + (_i)] )
 	#define _vlen()			( 3 * bw )
-	uint8_t abuf[bw + vec::LEN], bbuf[bw + vec::LEN];
+	uint8_t abuf[bw + VLEN], bbuf[bw + VLEN];
 
 	/* init the leftmost vector (vertically placed) */
 	uint16_t *base = (uint16_t *)((uint8_t *)work + sizeof(maxpos_t));
@@ -65,9 +65,12 @@ diagonal_affine(
 	}
 	uint64_t smax = OFS, pmax = 0;				/* max score and its position */
 
-	char_vec const cz;							/* zero */
-	vec const z, giv(-gi), gev(-ge), smv((uint16_t const *)score_matrix);
-	vec max(OFS);
+	vdp_t const z = zero_vdp();
+	vdp_t const giv = seta_vdp(-1 * gi);
+	vdp_t const gev = seta_vdp(-1 * ge);
+	vmat_t const smv = loadu_vmat(score_matrix);
+	vdp_t max = seta_vdp(OFS);
+
 	for(uint64_t p = 2; p < alen + blen + 1; p++) {
 		curr += _vlen();
 		uint16_t *pprv = curr - 2 * _vlen(), *prev = curr - _vlen();
@@ -76,83 +79,101 @@ diagonal_affine(
 			debug("D");
 			bbuf[bw] = (p / 2 + bw / 2 - 1) < blen ? encode_b(b[p / 2 + bw / 2 - 1]) : encode_n();
 
-			char_vec cb((int8_t const *)&bbuf[0]);
-			vec ch(&_s(prev, 0)), ce(&_e(prev, 0)); ch -= giv;
-			for(uint64_t i = 0; i < bw; i += vec::LEN) {
+			vchar_t cb = loadu_vchar(&bbuf[0]);
+			vdp_t ce = load_vdp(&_e(prev, 0));
+			for(size_t i = 0; i < bw; i += VLEN) {
 				debug("loop: %llu", i);
 
 				/* load the previous buffers */
-				char_vec va((int8_t const *)&abuf[i]), tb((int8_t const *)&bbuf[i + vec::LEN]);
-				vec th(&_s(prev, i + vec::LEN)), te(&_e(prev, i + vec::LEN)), pf(&_f(prev, i));
-				th -= giv;						/* add gap-open, common for the two directions */
+				vchar_t const va = loadu_vchar(&abuf[i]);
+				vchar_t const tb = loadu_vchar(&bbuf[i + VLEN]);
+
+				vdp_t pf = load_vdp(&_f(prev, i));
+				vdp_t te = load_vdp(&_e(prev, i + VLEN));
 
 				/* clear if the tail */
-				if(i + vec::LEN >= bw) { th = z; te = z; }
+				if(i + VLEN >= bw) { te = z; }
+				vdp_t pe = bsrd_vdp(te, ce);
+				ce = te;
 
 				/* rotate the vectors to align the vectors */
-				char_vec vb = tb.dsr(cb);
-				vec pv = ch, ph = th.dsr(ch), pe = te.dsr(ce);
-
-				cb = tb; ch = th; ce = te;
-				vb.store(&bbuf[i]);				/* store shifted */
-
-				va.print("a"); vb.print("b"); smv.shuffle(va | vb).print("score");
+				vchar_t const vb = bsrd_vchar(tb, cb);
+				storeu_vchar(&bbuf[i], vb);				/* store shifted */
+				cb = tb;
 
 				/* load the second previous */
-				vec ppv(&_s(pprv, i));
-				ppv += smv.shuffle(va | vb);
+				vdp_t pv = load_vdp(&_s(pprv, i));
+				vchar_t const xt = or_vchar(va, vb);
+				vmat_t const yt  = shuffle_vmat(smv, cvt_vchar_vmat(xt));
 
-				/* calc next */
-				vec ne = vec::max(ph, pe) - gev; ph.print("ph"); pe.print("pe"); ne.print("ne");
-				vec nf = vec::max(pv, pf) - gev; pv.print("pv"); pf.print("pf"); nf.print("nf");
-				ne.store(&_e(curr, i));
-				nf.store(&_f(curr, i));
+				print_vdp(pv);
+				print_vdp(add_vdp(cvt_vmat_vdp(yt), seta_vdp(32768)));
 
-				/* update s */
-				vec nv = vec::max(vec::max(ne, nf), ppv);
-				nv.store(&_s(curr, i)); nv.print("nv");
+				pv = add_vdp(pv, cvt_vmat_vdp(yt));
 
-				max = vec::max(max, nv);
+				pe = sub_vdp(pe, gev);
+				pf = sub_vdp(pf, gev);
+				pv = max_vdp(pv, max_vdp(pe, pf));
+				pe = max_vdp(pe, sub_vdp(pv, giv));
+				pf = max_vdp(pf, sub_vdp(pv, giv));
+
+				store_vdp(&_s(curr, i), pv);
+				store_vdp(&_e(curr, i), pe);
+				store_vdp(&_f(curr, i), pf);
+
+				print_vdp(pv); print_vdp(pe); print_vdp(pf);
+
+				max = max_vdp(max, pv);
 			}
 		} else {
 			debug("R");
-			char_vec ca((int8_t)((p / 2 + bw / 2 - 1) < alen ? encode_a(a[p / 2 + bw / 2 - 1]) : encode_n()));
-			vec cv, cf;
-			for(uint64_t i = 0; i < bw; i += vec::LEN) {
+			vchar_t ca = seta_vchar((int8_t)((p / 2 + bw / 2 - 1) < alen ? encode_a(a[p / 2 + bw / 2 - 1]) : encode_n()));
+			vdp_t cf = zero_vdp();
+			for(size_t i = 0; i < bw; i += VLEN) {
 				debug("loop: %llu", i);
 
 				/* load the previous buffers */
-				char_vec ta((int8_t const *)&abuf[i]), vb((int8_t const *)&bbuf[i]);
-				vec tv(&_s(prev, i)), pe(&_e(prev, i)), tf(&_f(prev, i));
-				tv -= giv;
+				vchar_t const ta = loadu_vchar(&abuf[i]);
+				vchar_t const vb = loadu_vchar(&bbuf[i]);
+
+				vdp_t pe = load_vdp(&_e(prev, i));
+				vdp_t tf = load_vdp(&_f(prev, i));
+				vdp_t pf = bsld_vdp(tf, cf);
+				cf = tf;
 
 				/* rotate the vectors */
-				char_vec va = ta.dsl(ca);
-				vec ph = tv, pv = tv.dsl(cv), pf = tf.dsl(cf);
-				ca = ta; cv = tv; cf = tf;
-				va.store(&abuf[i]);				/* store shifted */
-				va.print("a"); vb.print("b"); smv.shuffle(va | vb).print("score");
+				vchar_t const va = bsld_vchar(ta, ca);
+				storeu_vchar(&abuf[i], va);				/* store shifted */
+				ca = ta;
 
 				/* load the second previous */
-				vec ppv(&_s(pprv, i));
-				ppv += smv.shuffle(va | vb);
+				vdp_t pv = load_vdp(&_s(pprv, i));
+				vchar_t const xt = or_vchar(va, vb);
+				vmat_t const yt  = shuffle_vmat(smv, cvt_vchar_vmat(xt));
 
-				/* calc next */
-				vec ne = vec::max(ph, pe) - gev; ph.print("ph"); pe.print("pe"); ne.print("ne");
-				vec nf = vec::max(pv, pf) - gev; pv.print("pv"); pf.print("pf"); nf.print("nf");
-				ne.store(&_e(curr, i));
-				nf.store(&_f(curr, i));
+				print_vdp(pv);
+				print_vdp(add_vdp(cvt_vmat_vdp(yt), seta_vdp(32768)));
 
-				/* update s */
-				vec nv = vec::max(vec::max(ne, nf), ppv);
-				nv.store(&_s(curr, i)); nv.print("nv");
+				pv = add_vdp(pv, cvt_vmat_vdp(yt));
 
-				max = vec::max(max, nv);
+				pe = sub_vdp(pe, gev);
+				pf = sub_vdp(pf, gev);
+				pv = max_vdp(pv, max_vdp(pe, pf));
+				pe = max_vdp(pe, sub_vdp(pv, giv));
+				pf = max_vdp(pf, sub_vdp(pv, giv));
+
+				store_vdp(&_s(curr, i), pv);
+				store_vdp(&_e(curr, i), pe);
+				store_vdp(&_f(curr, i), pf);
+
+				print_vdp(pv); print_vdp(pe); print_vdp(pf);
+
+				max = max_vdp(max, pv);
 			}
 		}
 
 		/* update maxpos */
-		uint16_t m = max.hmax();
+		uint16_t const m = hmax_vdp(max);
 		debug("m(%u), pm(%llu)", m, smax);
 		if(m > smax) { smax = m; pmax = p; }
 	}
@@ -167,13 +188,13 @@ diagonal_affine(
 	#endif
 
 	base += _vlen() * pmax;
-	uint16_t m = max.hmax();
+	uint16_t const m = hmax_vdp(max);
 	debug("m(%u), amax(%llu)", m, smax);
-	for(uint64_t i = 0; i < bw; i += vec::LEN) {
-		vec s(&_s(base, i)), t(m);
-		s.print("s");
-		if(s == t) {
-			uint64_t q = i + tzcnt(s == t) / 2 - bw / 2;
+	for(uint64_t i = 0; i < bw; i += VLEN) {
+		vdp_t const s = load_vdp(&_s(base, i));
+		vdp_t const t = seta_vdp(m);
+		if(eq_vdp(s, t)) {
+			uint64_t q = i + tzcnt(eq_vdp(s, t)) / 2 - bw / 2;
 			r->apos =  pmax      / 2 - q;
 			r->bpos = (pmax + 1) / 2 + q;
 			debug("amax(%llu), bmax(%llu)", r->apos, r->bpos);
@@ -191,13 +212,13 @@ int main_ext(int argc, char *argv[])
 {
 	uint64_t alen = strlen(argv[2]);
 	uint64_t blen = strlen(argv[3]);
-	char *a = (char *)malloc(alen + vec::LEN + 1);
-	char *b = (char *)malloc(blen + vec::LEN + 1);
+	char *a = (char *)malloc(alen + VLEN + 1);
+	char *b = (char *)malloc(blen + VLEN + 1);
 
 	memcpy(a, argv[2], alen);
-	memset(a + alen, 0, vec::LEN + 1);
+	memset(a + alen, 0, VLEN + 1);
 	memcpy(b, argv[3], blen);
-	memset(b + blen, 0x80, vec::LEN + 1);
+	memset(b + blen, 0x80, VLEN + 1);
 
 	int8_t score_matrix[16] __attribute__(( aligned(16) ));
 	build_score_matrix(score_matrix, atoi(argv[4]), atoi(argv[5]));
