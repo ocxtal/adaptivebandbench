@@ -14,7 +14,7 @@ TGTS = bench
 all: $(TGTS)
 
 $(LIBS):
-	$(MAKE) -C `echo $@ | sed 's/\/.*//g'` CFLAGS="$(CFLAGS)" OFLAGS="$(OFLAGS)" all
+	$(MAKE) -C `echo $@ | sed 's/\/.*//g'` CC="$(CC)" CFLAGS="$(CFLAGS)" OFLAGS="$(OFLAGS)" all
 
 $(TGTS): $(SRCS) $(LIBS)
 	$(CC) $(CFLAGS) $(OFLAGS) -o $@ $(SRCS) $(LIBS)

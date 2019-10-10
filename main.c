@@ -192,7 +192,8 @@ void init_args(struct params_s *p)
 	p->rdseed = 0;
 	p->pipe = 0;
 	p->revcomp = 0;
-	p->list = mm_strdup("scalar,vertical,diagonal,striped,adaptive,simdadaptive,blast,simdblast");
+	// p->list = mm_strdup("scalar,vertical,diagonal,striped,adaptive,simdadaptive,blast,simdblast");
+	p->list = mm_strdup("scalar,vertical_sse,vertical_avx,diagonal_sse,diagonal_avx,striped_sse,striped_avx");
 
 	kv_init(p->buf);
 	kv_init(p->seq);
@@ -412,13 +413,13 @@ int main(int argc, char *argv[])
 	struct mapping_s map[] = {
 		/* static banded w/ standard matrix */
 		// fn(scalar), fn(vertical), fn(diagonal), fn(striped),
-		{ "scalar", scalar_affine },
-		{ "vertical", vertical_affine_sse },
-		{ "vertical", vertical_affine_avx },
-		{ "diagonal", diagonal_affine_sse },
-		{ "diagonal", diagonal_affine_avx },
-		{ "striped", striped_affine_sse },
-		{ "striped", striped_affine_avx }
+		// { "scalar", scalar_affine },
+		{ "vertical_sse", vertical_affine_sse },
+		{ "vertical_avx", vertical_affine_avx },
+		{ "diagonal_sse", diagonal_affine_sse },
+		{ "diagonal_avx", diagonal_affine_avx },
+		{ "striped_sse", striped_affine_sse },
+		{ "striped_avx", striped_affine_avx }
 
 		/* non-standard banded */
 		// fn(blast), fn(simdblast), fn(adaptive), fn(simdadaptive)
