@@ -11,7 +11,7 @@
 #include <string.h>
 
 #include "parasail.h"
-#include "parasail/matrix_lookup.h"
+#include "matrix_lookup.h"
 
 const parasail_matrix_t* parasail_matrix_lookup(const char *matrixname)
 {

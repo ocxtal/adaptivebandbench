@@ -23,9 +23,9 @@
 #endif
 
 #include "parasail.h"
-#include "parasail/io.h"
-#include "parasail/memory.h"
-#include "parasail/stats.h"
+#include "io.h"
+#include "memory.h"
+#include "stats.h"
 
 #ifdef UNUSED
 #elif defined(__GNUC__)

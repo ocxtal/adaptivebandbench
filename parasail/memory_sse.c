@@ -10,8 +10,8 @@
 
 #include <emmintrin.h>
 
-#include "parasail/memory.h"
-#include "parasail/internal_sse.h"
+#include "memory.h"
+#include "internal_sse.h"
 
 __m128i * parasail_memalign___m128i(size_t alignment, size_t size)
 {

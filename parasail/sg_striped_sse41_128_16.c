@@ -18,8 +18,8 @@
 #endif
 
 #include "parasail.h"
-#include "parasail/memory.h"
-#include "parasail/internal_sse.h"
+#include "memory.h"
+#include "internal_sse.h"
 
 
 static inline int16_t _mm_hmax_epi16_rpl(__m128i a) {
