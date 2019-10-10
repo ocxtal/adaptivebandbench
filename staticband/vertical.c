@@ -16,7 +16,7 @@
  * @fn vertical_affine
  */
 int
-vertical_affine(
+cat(vertical_affine, SUFFIX)(
 	void *work,
 	char const *a,
 	uint64_t alen,

@@ -15,7 +15,7 @@
  * @fn diagonal_affine
  */
 int
-diagonal_affine(
+cat(diagonal_affine, SUFFIX)(
 	void *work,
 	char const *a,
 	uint64_t alen,

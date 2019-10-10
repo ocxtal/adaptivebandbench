@@ -16,7 +16,7 @@
  * @fn striped_affine
  */
 int
-striped_affine(
+cat(striped_affine, SUFFIX)(
 	void *work,
 	char const *a,
 	uint64_t alen,

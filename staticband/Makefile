@@ -12,7 +12,7 @@ clean:
 	$(RM) -rf $(TGTS) $(OBJS)
 
 $(OBJS): $(SCALAR_SRCS) $(SIMD_SRCS)
-	$(CC) $(CFLAGS) $(OFLAGS) `if echo $@ | grep avx >/dev/null; then echo "-DBENCH_ARCH_AVX"; else echo "-DBENCH_ARCH_SSE"; fi` -D -c -o $@ `echo $@ | sed 's/\..*o$$/\.c/g'`
+	$(CC) $(CFLAGS) $(OFLAGS) `if echo $@ | grep avx >/dev/null; then echo "-DBENCH_ARCH_AVX"; else echo "-DBENCH_ARCH_SSE"; fi` -c -o $@ `echo $@ | sed 's/\..*o$$/\.c/g'`
 
 $(TGTS): $(OBJS)
 	$(AR) -crs $(TGTS) $^
