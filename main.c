@@ -10,12 +10,15 @@
 #include <stdarg.h>
 #include <getopt.h>
 #include <sys/time.h>
-#include "util.h"
 #include "kvec.h"
 #include "bench.h"
-#include "parasail.h"
-#include "ssw.h"
-#include "full.h"
+
+#include "full/full.h"
+#include "staticband/staticband.h"
+#include "parasail/parasail.h"
+#include "ssw/ssw.h"
+#include "wavefront/wavefront.h"
+
 
 #define M 					( 1 )
 #define X 					( 1 )
@@ -34,15 +37,6 @@ typedef struct { size_t n, m; uint64_t *a; } uint64_v;
 typedef struct { size_t n, m; void **a; } ptr_v;
 typedef struct { size_t n, m; int32_t *a; } int32_v;
 
-#define _base_signature			void *work, char const *a, uint64_t alen, char const *b, uint64_t blen, int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt, uint32_t bw
-int scalar_affine(_base_signature);
-int vertical_affine(_base_signature);
-int diagonal_affine(_base_signature);
-int striped_affine(_base_signature);
-int blast_affine(_base_signature);
-int simdblast_affine(_base_signature);
-int adaptive_affine(_base_signature);
-int simdadaptive_affine(_base_signature);
 
 /* wrapper of Myers' wavefront algorithm */
 extern "C" {
