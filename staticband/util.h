@@ -55,6 +55,7 @@ uint16_t hmax_vdp(vdp_t v)
 	return((uint16_t)_mm_extract_epi16(t, 0));
 }
 
+#if defined(DEBUG)
 #define print_vdp(x) { \
 	uint16_t buf[8]; \
 	storeu_vdp(buf, x); \
@@ -70,6 +71,9 @@ uint16_t hmax_vdp(vdp_t v)
 		buf[0] - 32768 \
 	); \
 }
+#else
+#define print_vdp(x)		;
+#endif
 
 
 #define zero_vchar()		((vchar_t){ .v = _mm_setzero_si128() })
@@ -94,8 +98,107 @@ uint16_t hmax_vdp(vdp_t v)
 
 
 
-
 #elif defined(BENCH_ARCH_AVX)
+
+#define SUFFIX				avx
+#define VLEN				( 16 )
+
+typedef struct { __m256i v; } vdp_t;
+typedef struct { __m128i v; } vchar_t;		/* lower half */
+typedef struct { __m128i v; } vmat_t;
+
+#define zero_vdp()			((vdp_t){ .v = _mm256_setzero_si256() })
+#define seta_vdp(x)			((vdp_t){ .v = _mm256_set1_epi16((uint16_t)(x)) })
+#define load_vdp(p)			((vdp_t){ .v = _mm256_load_si256((__m256i const *)(p)) })
+#define loadu_vdp(p)		((vdp_t){ .v = _mm256_loadu_si256((__m256i const *)(p)) })
+#define store_vdp(p, x)		{ _mm256_store_si256((__m256i *)(p), (x).v); }
+#define storeu_vdp(p, x)	{ _mm256_storeu_si256((__m256i *)(p), (x).v); }
+/*
+#define bsl_vdp(x, y)		((vdp_t){ .v = _mm256_slli_si256((x).v, 2 * (y)) })
+#define bsr_vdp(x, y)		((vdp_t){ .v = _mm256_srli_si256((x).v, 2 * (y)) })
+#define bsld_vdp(x, y)		((vdp_t){ .v = _mm256_alignr_epi8((x).v, (y).v, 14) })
+#define bsrd_vdp(x, y)		((vdp_t){ .v = _mm256_alignr_epi8((x).v, (y).v, 2) })
+*/
+#define bsl_vdp(x, imm) ( \
+	(imm) >= 8 ? (vdp_t){ .v = _mm256_slli_si256(_mm256_inserti128_si256(_mm256_setzero_si256(), _mm256_castsi256_si128((x).v), 1), 2 * (imm) - 16) } \
+	           : (vdp_t){ .v = _mm256_alignr_epi8((x).v, _mm256_permute2x128_si256((x).v, (x).v, 0x08), 16 - 2 * (imm)) } \
+)
+#define bsr_vdp(x, imm) ( \
+	(imm) >= 8 ? (vdp_t){ .v = _mm256_srli_si256(_mm256_castsi128_si256(_mm256_extracti128_si256((x).v, 1)), 2 * (imm) - 16) } \
+	           : (vdp_t){ .v = _mm256_alignr_epi8(_mm256_castsi128_si256(_mm256_extracti128_si256((x).v, 1)), (x).v, 2 * (imm)) } \
+)
+
+#define bsld_vdp(x, y)		((vdp_t){ .v = _mm256_alignr_epi8((x).v, _mm256_permute2x128_si256((x).v, (y).v, 0x03), 14) })
+#define bsrd_vdp(x, y)		((vdp_t){ .v = _mm256_alignr_epi8(_mm256_permute2x128_si256((x).v, (y).v, 0x03), (y).v, 2) })
+
+#define add_vdp(x, y)		((vdp_t){ .v = _mm256_add_epi16((x).v, (y).v) })
+#define sub_vdp(x, y)		((vdp_t){ .v = _mm256_subs_epu16((x).v, (y).v) })
+#define max_vdp(x, y)		((vdp_t){ .v = _mm256_max_epu16((x).v, (y).v) })
+#define eq_vdp(x, y)		( (uint64_t)_mm256_movemask_epi8(_mm256_cmpeq_epi16((x).v, (y).v)) )
+#define gt_vdp(x, y)		( (uint64_t)_mm256_movemask_epi8(_mm256_cmpgt_epi16(_mm256_sub_epi16((x).v, _mm256_set1_epi16(32768)), _mm256_sub_epi16((y).v, _mm256_set1_epi16(32768)))) )
+
+static inline
+uint16_t hmax_vdp(vdp_t v)
+{
+	__m128i t = _mm_max_epu16(
+		_mm256_castsi256_si128(v.v),
+		_mm256_extracti128_si256(v.v, 1)
+	);
+	t = _mm_max_epu16(t, _mm_srli_si128(t, 8));
+	t = _mm_max_epu16(t, _mm_srli_si128(t, 4));
+	t = _mm_max_epu16(t, _mm_srli_si128(t, 2));
+	return((uint16_t)_mm_extract_epi16(t, 0));
+}
+
+#if defined(DEBUG)
+#define print_vdp(x) { \
+	uint16_t buf[16]; \
+	storeu_vdp(buf, x); \
+	fprintf(stderr, \
+		"%s[%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d]\n", #x, \
+		buf[8 + 7] - 32768, \
+		buf[8 + 6] - 32768, \
+		buf[8 + 5] - 32768, \
+		buf[8 + 4] - 32768, \
+		buf[8 + 3] - 32768, \
+		buf[8 + 2] - 32768, \
+		buf[8 + 1] - 32768, \
+		buf[8 + 0] - 32768, \
+		buf[7] - 32768, \
+		buf[6] - 32768, \
+		buf[5] - 32768, \
+		buf[4] - 32768, \
+		buf[3] - 32768, \
+		buf[2] - 32768, \
+		buf[1] - 32768, \
+		buf[0] - 32768 \
+	); \
+}
+#else
+#define print_vdp(x)		;
+#endif
+
+
+#define zero_vchar()		((vchar_t){ .v = _mm_setzero_si128() })
+#define seta_vchar(x)		((vchar_t){ .v = _mm_set1_epi16(x) })
+#define load_vchar(p)		((vchar_t){ .v = _mm_load_si128((__m128i const *)(p)) })
+#define loadu_vchar(p)		((vchar_t){ .v = _mm_loadu_si128((__m128i const *)(p)) })
+#define store_vchar(p, x)	{ _mm_store_si128((__m128i *)(p), (x).v); }
+#define storeu_vchar(p, x)	{ _mm_storeu_si128((__m128i *)(p), (x).v); }
+// #define bsl_vchar(x, y)		((vchar_t){ .v = _mm_slli_si128((x).v, (y)) })
+// #define bsr_vchar(x, y)		((vchar_t){ .v = _mm_srli_si128((x).v, (y)) })
+#define bsld_vchar(x, y)	((vchar_t){ .v = _mm_alignr_epi8((x).v, (y).v, 15) })
+#define bsrd_vchar(x, y)	((vchar_t){ .v = _mm_alignr_epi8((x).v, (y).v, 1) })
+
+
+#define loadu_vmat(p)		((vmat_t){ .v = _mm_loadu_si128((__m128i const *)(p)) })
+#define shuffle_vmat(x, y)	((vmat_t){ .v = _mm_shuffle_epi8((x).v, (y).v); })
+
+
+#define cvt_vchar_vmat(x)	((vmat_t){ .v = (x).v })
+#define cvt_vmat_vdp(x)		((vdp_t){ .v = _mm256_cvtepi8_epi16((x).v) })
+
+
 
 
 #endif
