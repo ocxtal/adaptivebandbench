@@ -1,6 +1,6 @@
 
 CC  = gcc
-CFLAGS = -Wall -Wno-unused-function -std=c99 -DBENCH
+CFLAGS = -Wall -Wno-unused-function -std=gnu99 -DBENCH
 OFLAGS = -O3 -march=native
 
 # CXX = g++
@@ -14,10 +14,10 @@ TGTS = bench
 all: $(TGTS)
 
 $(LIBS):
-	$(MAKE) -C `echo $@ | sed 's/\/.*//g'` all
+	$(MAKE) -C `echo $@ | sed 's/\/.*//g'` CFLAGS="$(CFLAGS)" OFLAGS="$(OFLAGS)" all
 
 $(TGTS): $(SRCS) $(LIBS)
-	$(CC) $(CFLAGS) -o $@ $(SRCS) $(LIBS)
+	$(CC) $(CFLAGS) $(OFLAGS) -o $@ $(SRCS) $(LIBS)
 
 clean:
 	rm -rf $(TGTS) $(join $(BENCH_MODULES), $(BENCH_MODULES:%=/%.a)) $(BENCH_MODULES:%=%/*.o)
