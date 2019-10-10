@@ -5,7 +5,6 @@
  * @brief scalar parallelization of the standard banded matrix
  */
 #include <string.h>
-#include "sse.h"
 #include "util.h"
 #include "log.h"
 
@@ -33,7 +32,7 @@ scalar_affine(
 	#define _e(_p, _i)		( (_p)[2 * bw + (_i)] )
 	#define _f(_p, _i)		( (_p)[4 * bw + (_i)] )
 	#define _vlen()			( 6 * bw )
-	uint8_t c[2 * bw + vec::LEN];
+	uint8_t c[2 * bw + VLEN];
 
 	/* init the leftmost vector */
 	uint16_t *base = (uint16_t *)((uint8_t *)work + sizeof(maxpos_t)), *curr = base, *prev = base;
@@ -61,29 +60,30 @@ scalar_affine(
 		c[2 * bw] = (apos + bw - 1) < blen ? encode_b(b[apos + bw - 1]) : encode_n();
 
 		/* init f */
-		int32_t pf = 0, pv = 0, pd = _s(prev, 0);
+		int32_t pf = 0;
 
 		/* bpos = apos + bofs - bw/2 */
-		for(uint64_t bofs = 0; bofs < 2 * bw; bofs++) {
+		for(size_t bofs = 0; bofs < 2 * bw; bofs++) {
 			/* load prev vectors */
-			int32_t ph = bofs < (2 * bw - 1) ? _s(prev, bofs + 1) : 0;
+			int32_t pv = _s(prev, bofs);
 			int32_t pe = bofs < (2 * bw - 1) ? _e(prev, bofs + 1) : 0;
 			int32_t score = score_matrix[ach | c[bofs + 1]];
 			debug("(%c, %c), pd(%d), ph(%d), pe(%d), score(%d)", "ACGT"[ach], "ACGT"[c[bofs + 1]>>2], pd - OFS, ph - OFS, pe - OFS, score - OFS);
 
 			c[bofs] = c[bofs + 1];				/* shift by one */
 
-			pe = MAX2(0, MAX2(ph + gi, pe) + ge);
-			pf = MAX2(0, MAX2(pv + gi, pf) + ge);
-			pv = MAX4(0, pd + score, pe, pf);
+			pe = MAX2(0, pe + ge);
+			pf = MAX2(0, pf + ge);
+			pv = MAX4(-gi, pv + score, pe, pf);
+
+			pe = MAX2(pv + gi, pe);
+			pf = MAX2(pv + gi, pf);
 			_s(curr, bofs) = pv;
 			_e(curr, bofs) = pe;
 			_f(curr, bofs) = pf;
 			if(pv > max) { max = pv; amax = apos + 1; bmax = bofs - bw + apos + 1; }
 
 			debug("apos(%llu), bofs(%llu), e(%d), f(%d), s(%d), max(%d)", apos, bofs, pe - OFS, pf - OFS, pv - OFS, max - OFS);
-
-			pd = ph;
 		}
 
 		/* update maxpos */
@@ -110,13 +110,13 @@ int main_ext(int argc, char *argv[])
 {
 	uint64_t alen = strlen(argv[2]);
 	uint64_t blen = strlen(argv[3]);
-	char *a = (char *)malloc(alen + vec::LEN + 1);
-	char *b = (char *)malloc(blen + vec::LEN + 1);
+	char *a = (char *)malloc(alen + VLEN + 1);
+	char *b = (char *)malloc(blen + VLEN + 1);
 
 	memcpy(a, argv[2], alen);
-	memset(a + alen, 0, vec::LEN + 1);
+	memset(a + alen, 0, VLEN + 1);
 	memcpy(b, argv[3], blen);
-	memset(b + blen, 0x80, vec::LEN + 1);
+	memset(b + blen, 0x80, VLEN + 1);
 
 	int8_t score_matrix[16] __attribute__(( aligned(16) ));
 	build_score_matrix(score_matrix, atoi(argv[4]), atoi(argv[5]));

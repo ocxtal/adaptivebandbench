@@ -8,14 +8,79 @@
 #ifndef _UTIL_H_INCLUDED
 #define _UTIL_H_INCLUDED
 
-#include "log.h"
-#include "bench.h"
 #include <stdio.h>
 #include <stdint.h>				/** uint32_t, uint64_t, ... */
 #include <stdlib.h>
 #include <stddef.h>				/** offsetof */
 #include <string.h>				/** memset, memcpy */
 #include <smmintrin.h>
+
+
+#define cat_intl(x, y)		x##_##y
+#define cat(x, y)			cat_intl(x, y)
+
+
+#if defined(BENCH_ARCH_SSE)
+
+#define SUFFIX				sse
+#define VLEN				( 8 )
+
+typedef struct { __m128i v; } vdp_t;
+typedef struct { __m128i v; } vchar_t;		/* lower half */
+typedef struct { __m128i v; } vmat_t;
+
+#define zero_vdp()			((vdp_t){ .v = _mm_setzero_si128() })
+#define seta_vdp(x)			((vdp_t){ .v = _mm_set1_epi16(x) })
+#define load_vdp(p)			((vdp_t){ .v = _mm_load_si128((__m128i const *)(p)) })
+#define loadu_vdp(p)		((vdp_t){ .v = _mm_loadu_si128((__m128i const *)(p)) })
+#define store_vdp(p, x)		{ _mm_store_si128((__m128i *)(p), (x).v); }
+#define storeu_vdp(p, x)	{ _mm_storeu_si128((__m128i *)(p), (x).v); }
+#define bsl_vdp(x, y)		((vdp_t){ .v = _mm_slli_si128((x).v, 2 * (y)) })
+#define bsr_vdp(x, y)		((vdp_t){ .v = _mm_srli_si128((x).v, 2 * (y)) })
+#define bsld_vdp(x, y)		((vdp_t){ .v = _mm_alignr_epi8((x).v, (y).v, 14) })
+#define bsrd_vdp(x, y)		((vdp_t){ .v = _mm_alignr_epi8((x).v, (y).v, 2) })
+#define add_vdp(x, y)		((vdp_t){ .v = _mm_add_epi16((x).v, (y).v) })
+#define sub_vdp(x, y)		((vdp_t){ .v = _mm_subs_epu16((x).v, (y).v) })
+#define max_vdp(x, y)		((vdp_t){ .v = _mm_max_epu16((x).v, (y).v) })
+#define eq_vdp(x, y)		( (uint64_t)_mm_movemask_epi8(_mm_cmpeq_epi16((x).v, (y).v)) )
+#define gt_vdp(x, y)		( (uint64_t)_mm_movemask_epi8(_mm_cmpgt_epi16(_mm_sub_epi16((x).v, _mm_set1_epi16(32768), _mm_sub_epi16((y).v, _mm_set1_epi16(32768))) )
+
+static inline
+uint16_t hmax_vdp(vdp_t v)
+{
+	__m128i t = v.v;
+	t = _mm_max_epu16(t, _mm_srli_si128(t, 8));
+	t = _mm_max_epu16(t, _mm_srli_si128(t, 4));
+	t = _mm_max_epu16(t, _mm_srli_si128(t, 2));
+	return((uint16_t)_mm_extract_epi16(t, 0));
+}
+
+
+#define zero_vchar()		((vchar_t){ .v = _mm_setzero_si128() })
+#define seta_vchar(x)		((vchar_t){ .v = _mm_set1_epi16(x) })
+#define load_vchar(p)		((vchar_t){ .v = _mm_loadl_epi64((__m128i const *)(p)) })
+#define loadu_vchar(p)		((vchar_t){ .v = _mm_loadl_epi64((__m128i const *)(p)) })
+#define store_vchar(p, x)	{ _mm_storel_epi64((__m128i *)(p), (x).v); }
+#define storeu_vchar(p, x)	{ _mm_storel_epi64((__m128i *)(p), (x).v); }
+// #define bsl_vchar(x, y)		((vchar_t){ .v = _mm_slli_si128((x).v, (y)) })
+// #define bsr_vchar(x, y)		((vchar_t){ .v = _mm_srli_si128((x).v, (y)) })
+#define bsld_vchar(x, y)	((vchar_t){ .v = _mm_srli_si128(_mm_unpack_epi64((y).v, (x).v), 7) })
+#define bsrd_vchar(x, y)	((vchar_t){ .v = _mm_srli_si128(_mm_unpack_epi64((y).v, (x).v), 1) })
+
+
+#define loadu_vmat(p)		((vmat_t){ .v = _mm_loadu_si128((__m128i const *)(p)) })
+#define shuffle_vmat(x, y)	((vmat_t){ .v = _mm_shuffle_epi8((x).v, (y).v); })
+
+
+#define cvt_vchar_vmat(x)	((vmat_t){ .v = (x).v })
+#define cvt_vmat_vdp(x)		((vdp_t){ .v = _mm_cvtepi8_epi16((x).v) })
+
+
+#elif defined(BENCH_ARCH_AVX)
+
+
+#endif
+
 
 /* result container */
 typedef struct maxpos_s {
