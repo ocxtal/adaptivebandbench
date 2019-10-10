@@ -1,7 +1,7 @@
 
 
 /* wrapper of Myers' wavefront algorithm */
-#include "wave/align.h"
+#include "align.h"
 
 int enlarge_vector(Work_Data *work, int newmax);
 int enlarge_points(Work_Data *work, int newmax);
