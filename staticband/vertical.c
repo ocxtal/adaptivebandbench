@@ -5,7 +5,6 @@
  * @brief vertical parallelization of the standard banded matrix
  */
 #include <string.h>
-#include "sse.h"
 #include "util.h"
 #include "log.h"
 
@@ -26,14 +25,14 @@ vertical_affine(
 	int8_t *score_matrix, int8_t gi, int8_t ge, int16_t xt, uint32_t bw)
 {
 	if(alen == 0 || blen == 0) { return(0); }
-	debug("%s, %s", a, b);
+	debug("start, %s, %s", a, b);
 
 	/* s: score vector, e: horizontal gap, f: verticalical gap */
 	#define _s(_p, _i)		( (_p)[         (_i)] )
 	#define _e(_p, _i)		( (_p)[2 * bw + (_i)] )
 	#define _f(_p, _i)		( (_p)[4 * bw + (_i)] )
 	#define _vlen()			( 6 * bw )
-	uint8_t c[2 * bw + vec::LEN];
+	uint8_t c[2 * bw + VLEN];
 
 	/* init the leftmost vector (verticalically placed) */
 	uint16_t *base = (uint16_t *)((uint8_t *)work + sizeof(maxpos_t)), *curr = base, *prev = base;
@@ -52,58 +51,75 @@ vertical_affine(
 	_f(curr, bw) = OFS + gi;
 	uint64_t smax = OFS, amax = 0;				/* max score and its position */
 
-	vec const z, giv(-gi), gev(-ge), gev2(-2*ge), gev4(-4*ge), smv((uint16_t const *)score_matrix);
-	vec max(OFS);
+	vdp_t const z = zero_vdp();
+	vdp_t const giv  = seta_vdp(-1 * gi);
+	vdp_t const gev  = seta_vdp(-1 * ge);
+	vdp_t const gev2 = seta_vdp(-2 * ge);
+	vdp_t const gev4 = seta_vdp(-4 * ge);
+	vmat_t const smv = loadu_vmat(score_matrix);
+	vdp_t max = seta_vdp(OFS);
+
 	for(uint64_t apos = 0; apos < alen; apos++) {
 		debug("apos(%llu)", apos);
-		char_vec av(encode_a(a[apos]));
+		vchar_t const av = seta_vchar(encode_a(a[apos]));
 		prev = curr; curr += _vlen();
 
 		/* fetch the next base */
 		c[2 * bw] = (apos + bw - 1) < blen ? encode_b(b[apos + bw - 1]) : encode_n();
 
 		/* init f */
-		vec pf, cv(&_s(prev, 0)), ce(&_e(prev, 0));
+		vdp_t pf = zero_vdp();
+		vdp_t ce = load_vdp(&_e(prev, 0));
 
 		/* bpos = apos + bofs - bw/2 */
-		for(uint64_t bofs = 0; bofs < 2 * bw; bofs += vec::LEN) {
+		for(uint64_t bofs = 0; bofs < 2 * bw; bofs += VLEN) {
 			debug("bofs(%llu)", bofs);
 			/* load prev vectors */
-			vec tv(&_s(prev, bofs + vec::LEN)), te(&_e(prev, bofs + vec::LEN));
-			if(bofs + vec::LEN >= 2 * bw) { tv = z; te = z; }
-			vec pv = cv, ph = tv.dsr(cv), pe = te.dsr(ce);
-			cv = tv; ce = te;
+			vdp_t pv = load_vdp(&_s(prev, bofs));
+			vdp_t te = load_vdp(&_e(prev, bofs + VLEN));
+			if(bofs + VLEN >= 2 * bw) { te = z; }
+			vdp_t pe = bsrd_vdp(te, ce);
+			ce = te;
 
 			/* calc score */
-			char_vec bv((int8_t const *)&c[bofs + 1]);
-			bv.store(&c[bofs]);					/* shift by one */
-			pv = vec::max(pv, giv);				/* ensure not rounded by adding the score profile */
-			pv += smv.shuffle(av | bv);
+			vchar_t const bv = loadu_vchar(&c[bofs + 1]);
+			store_vchar(&c[bofs], bv);			/* shift by one */
+			vchar_t const xt = or_vchar(av, bv);
+			vmat_t const yt  = shuffle_vmat(smv, cvt_vchar_vmat(xt));
+
+			print_vdp(pe);
+			print_vdp(add_vdp(cvt_vmat_vdp(yt), seta_vdp(32768)));
+
+			pv = max_vdp(pv, giv);				/* ensure not rounded by adding the score profile */
+			pv = add_vdp(pv, cvt_vmat_vdp(yt));
 
 			/* calc e */
-			pe = vec::max(ph - giv, pe) - gev;
-			pe.store(&_e(curr, bofs)); pe.print("pe");
-
-			/* calc tentative s */
-			pv = vec::max(pv, pe); pv.print("pv (tentative)");
+			pe = sub_vdp(pe, gev);
+			pv = max_vdp(pv, pe);
 
 			/* calc f: verticalical gap propagation */
-			pf = vec::max(pv - giv, (pf>>7) - gev);
-			pf = vec::max(pf, (pf<<1) - gev);
-			pf = vec::max(pf, (pf<<2) - gev2);
-			pf = vec::max(pf, (pf<<4) - gev4);
+			pf = sub_vdp(bsr_vdp(pf, 7), gev);
+			pf = max_vdp(pf, sub_vdp(pv, giv));
+			pf = max_vdp(pf, sub_vdp(bsl_vdp(pf, 1), gev));
+			pf = max_vdp(pf, sub_vdp(bsl_vdp(pf, 2), gev2));
+			pf = max_vdp(pf, sub_vdp(bsl_vdp(pf, 4), gev4));
 
 			/* fixup s */
-			pv = vec::max(pv, pf); pv.print("pv");
-			pv.store(&_s(curr, bofs));
-			pf.store(&_f(curr, bofs)); pf.print("pf");
+			pv = max_vdp(pv, pf);
+			pe = max_vdp(pe, sub_vdp(pv, giv));
+
+			store_vdp(&_s(curr, bofs), pv);
+			store_vdp(&_e(curr, bofs), pe);
+			store_vdp(&_f(curr, bofs), pf);
+
+			print_vdp(pv); print_vdp(pe); print_vdp(pf);
 
 			/* update max */
-			max = vec::max(max, pv);
+			max = max_vdp(max, pv);
 		}
 
 		/* update maxpos */
-		uint16_t m = max.hmax();
+		uint16_t const m = hmax_vdp(max);
 		debug("m(%u), pm(%u)", m, smax);
 		if(m > smax) { smax = m; amax = apos + 1; }
 	}
@@ -118,15 +134,15 @@ vertical_affine(
 	#endif
 
 	base += _vlen() * amax;
-	uint16_t m = max.hmax();
+	uint16_t const m = hmax_vdp(max);
 	debug("m(%u), amax(%llu)", m, amax);
-	for(uint64_t bofs = 0; bofs < bw; bofs += vec::LEN) {
-		vec s(&_s(base, bofs)), t(m);
-		s.print("s");
-		if(s == t) {
+	for(uint64_t bofs = 0; bofs < bw; bofs += VLEN) {
+		vdp_t const s = load_vdp(&_s(base, bofs));
+		vdp_t const t = seta_vdp(m);
+		if(eq_vdp(s, t)) {
 			r->apos = amax;
-			r->bpos = tzcnt(s == t) / 2 + bofs - bw + amax;
-			debug("amax(%llu), bmax(%llu), mask(%hx), bofs(%llu)", r->apos, r->bpos, s == t, bofs);
+			r->bpos = tzcnt(eq_vdp(s, t)) / 2 + bofs - bw + amax;
+			debug("amax(%llu), bmax(%llu), mask(%hx), bofs(%llu)", r->apos, r->bpos, eq_vdp(s, t), bofs);
 			break;
 		}
 	}
@@ -141,13 +157,13 @@ int main_ext(int argc, char *argv[])
 {
 	uint64_t alen = strlen(argv[2]);
 	uint64_t blen = strlen(argv[3]);
-	char *a = (char *)malloc(alen + vec::LEN + 1);
-	char *b = (char *)malloc(blen + vec::LEN + 1);
+	char *a = (char *)malloc(alen + VLEN + 1);
+	char *b = (char *)malloc(blen + VLEN + 1);
 
 	memcpy(a, argv[2], alen);
-	memset(a + alen, 0, vec::LEN + 1);
+	memset(a + alen, 0, VLEN + 1);
 	memcpy(b, argv[3], blen);
-	memset(b + blen, 0x80, vec::LEN + 1);
+	memset(b + blen, 0x80, VLEN + 1);
 
 	int8_t score_matrix[16] __attribute__(( aligned(16) ));
 	build_score_matrix(score_matrix, atoi(argv[4]), atoi(argv[5]));

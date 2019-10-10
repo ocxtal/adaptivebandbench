@@ -77,7 +77,7 @@ uint16_t hmax_vdp(vdp_t v)
 
 
 #define zero_vchar()		((vchar_t){ .v = _mm_setzero_si128() })
-#define seta_vchar(x)		((vchar_t){ .v = _mm_set1_epi16(x) })
+#define seta_vchar(x)		((vchar_t){ .v = _mm_set1_epi8(x) })
 #define load_vchar(p)		((vchar_t){ .v = _mm_loadl_epi64((__m128i const *)(p)) })
 #define loadu_vchar(p)		((vchar_t){ .v = _mm_loadl_epi64((__m128i const *)(p)) })
 #define store_vchar(p, x)	{ _mm_storel_epi64((__m128i *)(p), (x).v); }
@@ -86,10 +86,11 @@ uint16_t hmax_vdp(vdp_t v)
 // #define bsr_vchar(x, y)		((vchar_t){ .v = _mm_srli_si128((x).v, (y)) })
 #define bsld_vchar(x, y)	((vchar_t){ .v = _mm_srli_si128(_mm_unpack_epi64((y).v, (x).v), 7) })
 #define bsrd_vchar(x, y)	((vchar_t){ .v = _mm_srli_si128(_mm_unpack_epi64((y).v, (x).v), 1) })
+#define or_vchar(x, y)		((vchar_t){ .v = _mm_or_si128((x).v, (y).v) })
 
 
 #define loadu_vmat(p)		((vmat_t){ .v = _mm_loadu_si128((__m128i const *)(p)) })
-#define shuffle_vmat(x, y)	((vmat_t){ .v = _mm_shuffle_epi8((x).v, (y).v); })
+#define shuffle_vmat(x, y)	((vmat_t){ .v = _mm_shuffle_epi8((x).v, (y).v) })
 
 
 #define cvt_vchar_vmat(x)	((vmat_t){ .v = (x).v })
@@ -180,7 +181,7 @@ uint16_t hmax_vdp(vdp_t v)
 
 
 #define zero_vchar()		((vchar_t){ .v = _mm_setzero_si128() })
-#define seta_vchar(x)		((vchar_t){ .v = _mm_set1_epi16(x) })
+#define seta_vchar(x)		((vchar_t){ .v = _mm_set1_epi8(x) })
 #define load_vchar(p)		((vchar_t){ .v = _mm_load_si128((__m128i const *)(p)) })
 #define loadu_vchar(p)		((vchar_t){ .v = _mm_loadu_si128((__m128i const *)(p)) })
 #define store_vchar(p, x)	{ _mm_store_si128((__m128i *)(p), (x).v); }
@@ -189,10 +190,11 @@ uint16_t hmax_vdp(vdp_t v)
 // #define bsr_vchar(x, y)		((vchar_t){ .v = _mm_srli_si128((x).v, (y)) })
 #define bsld_vchar(x, y)	((vchar_t){ .v = _mm_alignr_epi8((x).v, (y).v, 15) })
 #define bsrd_vchar(x, y)	((vchar_t){ .v = _mm_alignr_epi8((x).v, (y).v, 1) })
+#define or_vchar(x, y)		((vchar_t){ .v = _mm_or_si128((x).v, (y).v) })
 
 
 #define loadu_vmat(p)		((vmat_t){ .v = _mm_loadu_si128((__m128i const *)(p)) })
-#define shuffle_vmat(x, y)	((vmat_t){ .v = _mm_shuffle_epi8((x).v, (y).v); })
+#define shuffle_vmat(x, y)	((vmat_t){ .v = _mm_shuffle_epi8((x).v, (y).v) })
 
 
 #define cvt_vchar_vmat(x)	((vmat_t){ .v = (x).v })
