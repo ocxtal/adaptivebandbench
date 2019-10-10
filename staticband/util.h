@@ -121,7 +121,7 @@ typedef struct { __m128i v; } vmat_t;
 #define bsrd_vdp(x, y)		((vdp_t){ .v = _mm256_alignr_epi8((x).v, (y).v, 2) })
 */
 #define bsl_vdp(x, imm) ( \
-	(imm) >= 8 ? (vdp_t){ .v = _mm256_slli_si256(_mm256_inserti128_si256(_mm256_setzero_si256(), _mm256_castsi256_si128((x).v), 1), 2 * (imm) - 16) } \
+	(imm) >= 8 ? (vdp_t){ .v = _mm256_slli_si256(_mm256_permute2x128_si256((x).v, (x).v, 0x08), 2 * (imm) - 16) } \
 	           : (vdp_t){ .v = _mm256_alignr_epi8((x).v, _mm256_permute2x128_si256((x).v, (x).v, 0x08), 16 - 2 * (imm)) } \
 )
 #define bsr_vdp(x, imm) ( \

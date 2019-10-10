@@ -56,6 +56,9 @@ cat(vertical_affine, SUFFIX)(
 	vdp_t const gev  = seta_vdp(-1 * ge);
 	vdp_t const gev2 = seta_vdp(-2 * ge);
 	vdp_t const gev4 = seta_vdp(-4 * ge);
+	#if VLEN == 16
+		vdp_t const gev8 = seta_vdp(-8 * ge);
+	#endif
 	vmat_t const smv = loadu_vmat(score_matrix);
 	vdp_t max = seta_vdp(OFS);
 
@@ -98,11 +101,14 @@ cat(vertical_affine, SUFFIX)(
 			pv = max_vdp(pv, pe);
 
 			/* calc f: verticalical gap propagation */
-			pf = sub_vdp(bsr_vdp(pf, 7), gev);
+			pf = sub_vdp(bsr_vdp(pf, VLEN - 1), gev);
 			pf = max_vdp(pf, sub_vdp(pv, giv));
 			pf = max_vdp(pf, sub_vdp(bsl_vdp(pf, 1), gev));
 			pf = max_vdp(pf, sub_vdp(bsl_vdp(pf, 2), gev2));
 			pf = max_vdp(pf, sub_vdp(bsl_vdp(pf, 4), gev4));
+			#if VLEN == 16
+				pf = max_vdp(pf, sub_vdp(bsl_vdp(pf, 8), gev8));
+			#endif
 
 			/* fixup s */
 			pv = max_vdp(pv, pf);
