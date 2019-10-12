@@ -448,7 +448,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* collect scores with full-sized dp */
-	calc_score(&params);
+	// calc_score(&params);
 	mm_split_foreach(params.list, ",", {
 		for(uint64_t j = 0; j < sizeof(map) / sizeof(struct mapping_s); j++) {
 			debug("%s, %s", p, map[j].name);
