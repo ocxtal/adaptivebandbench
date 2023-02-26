@@ -1,5 +1,6 @@
 # Assessment on Adaptive-Banded Dynamic Programming algorithm for the nucleotide semi-global alignment
 
+**Please see the branch [the-commit-that-i-took-benchmarks-for-the-preprint](https://github.com/ocxtal/adaptivebandbench/tree/the-commit-that-i-took-benchmarks-for-the-preprint) if you want to reproduce the experiment in the preprint.**
 
 This repository contains benchmarking (recall benchmark and speed benchmark) programs and scripts of the [adaptive-banded semi-global alignment algorithm](https://doi.org/10.1101/130633). If you are thinking of porting (or implementing) adaptive banded algorithm to your program, you should consider using [GABA library](https://github.com/ocxtal/libgaba) that implements the algorithm with another acceleration algorithm (it is much faster and much more stable).
 
